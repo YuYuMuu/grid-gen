@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Adobe Grid Generator Pro</title>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --bg-deep: #0f1218;
+            --bg-side: #161b22;
+            --bg-card: #1c2128;
+            --border-color: #30363d;
+            --text-main: #c9d1d9;
+            --text-dim: #8b949e;
+            --text-light: #ffffff;
+            --ps-guide: #00ffba; 
+            --ps-guide-hover: #52ffd3;
+            --ps-selection: #ff00ff;
+        }
+
+        * { box-sizing: border-box; touch-action: none; }
+
+        body, html {
+            margin: 0; padding: 0; height: 100%;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg-deep);
+            color: var(--text-main);
+            overflow: hidden;
+        }
+
+        #app { display: flex; height: 100vh; }
+
+        .sidebar {
+            width: 380px;
+            background-color: var(--bg-side);
+            border-right: 1px solid var(--border-color);
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            z-index: 10;
+        }
+
+        h1 { font-size: 1.5rem; margin: 0; }
+        .text-guide { color: var(--ps-guide); }
+        .subtitle { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 2rem; }
+
+        .config-section { margin-bottom: 2rem; }
+        .config-section h3 {
+            font-size: 0.8rem; text-transform: uppercase;
+            color: var(--text-dim); display: flex; align-items: center;
+            gap: 8px; margin-bottom: 1rem;
+            letter-spacing: 1px;
+        }
+
+        .input-group { margin-bottom: 1rem; }
+        label { display: block; font-size: 0.75rem; margin-bottom: 0.4rem; color: var(--text-dim); }
+
+        select, input {
+            width: 100%; background: var(--bg-card);
+            border: 1px solid var(--border-color); color: var(--text-main);
+            padding: 0.6rem; border-radius: 6px; outline: none;
+            font-size: 0.9rem;
+        }
+
+        select:focus, input:focus { border-color: var(--ps-guide); }
+        .dimensions-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+        .preview-area {
+            flex: 1; position: relative;
+            background: radial-gradient(circle, #1c2128 0%, #0f1218 100%);
+            overflow: hidden;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        #canvasWrapper {
+            transform-origin: center;
+            will-change: transform;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .canvas-container {
+            position: relative;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+            background: #ffffff;
+        }
+
+        canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+
+        .canvas-info {
+            position: absolute; bottom: 20px; left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.75rem; color: var(--text-dim);
+            background: rgba(0,0,0,0.6); padding: 6px 16px; border-radius: 20px;
+            backdrop-filter: blur(8px); pointer-events: none;
+            z-index: 5;
+        }
+
+        .zoom-controls {
+            position: absolute; top: 20px; right: 20px;
+            display: flex; flex-direction: column; gap: 8px;
+            z-index: 5;
+        }
+
+        .control-btn {
+            width: 40px; height: 40px;
+            background: var(--bg-card); border: 1px solid var(--border-color);
+            color: var(--text-main); border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: 0.2s;
+        }
+        .control-btn:hover:not(:disabled) { background: var(--ps-guide); color: var(--bg-deep); }
+        .control-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        .history-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 1rem;
+        }
+
+        .btn-stack { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 10px; }
+        .btn {
+            padding: 0.75rem; border: none; border-radius: 6px;
+            font-weight: 600; cursor: pointer; transition: all 0.2s; color: var(--bg-deep);
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            background-color: var(--ps-guide);
+            font-size: 0.85rem;
+        }
+        .btn:hover { background-color: var(--ps-guide-hover); transform: translateY(-1px); }
+        .btn-outline {
+            background: transparent; border: 1px solid var(--ps-guide); color: var(--ps-guide);
+        }
+        .btn-outline:hover { background: rgba(0,255,186,0.1); }
+        
+        .interaction-hint {
+            position: absolute; top: 20px; left: 20px;
+            font-size: 0.7rem; color: var(--ps-guide);
+            background: rgba(0,0,0,0.4); padding: 5px 10px; border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <aside class="sidebar">
+            <header>
+                <h1 class="text-guide">GridGen<span style="color:var(--text-light)">.pro</span></h1>
+                <p class="subtitle">Systèmes de Grilles & Export Adobe</p>
+            </header>
+
+            <section class="config-section">
+                <h3><i data-lucide="layout"></i> Format</h3>
+                <div class="input-group">
+                    <select id="formatPresets">
+                        <option value="210,297">A4 (210 x 297 mm)</option>
+                        <option value="297,420">A3 (297 x 420 mm)</option>
+                        <option value="148,210">A5 (148 x 210 mm)</option>
+                        <option value="420,594">A2 (420 x 594 mm)</option>
+                        <option value="210,210">Carré (210 x 210 mm)</option>
+                        <option value="600,2000">Roll-up (600 x 2000 mm)</option>
+                        <option value="1080,1080">Instagram (1080px)</option>
+                        <option value="custom">Personnalisé</option>
+                    </select>
+                </div>
+                <div class="dimensions-row">
+                    <div class="input-group"><label>L (mm/px)</label><input type="number" id="widthInput" value="210"></div>
+                    <div class="input-group"><label>H (mm/px)</label><input type="number" id="heightInput" value="297"></div>
+                </div>
+            </section>
+
+            <section class="config-section">
+                <h3><i data-lucide="grid"></i> Composition</h3>
+                <div class="input-group">
+                    <select id="gridSystem">
+                        <optgroup label="Modulaire">
+                            <option value="modular">Grille Modulaire</option>
+                        </optgroup>
+                        <optgroup label="Classiques & Harmoniques">
+                            <option value="golden">Nombre d'Or (Φ)</option>
+                            <option value="thirds">Règle des Tiers</option>
+                            <option value="villard">Villard de Honnecourt</option>
+                            <option value="van_de_graaf">Van de Graaf</option>
+                            <option value="root2">Ratio √2</option>
+                            <option value="fibonacci">Séquence Fibonacci</option>
+                        </optgroup>
+                        <optgroup label="Géométriques & Sacrés">
+                            <option value="circle_center">Cercles Concentriques</option>
+                            <option value="vesica">Vesica Piscis</option>
+                            <option value="triangle_mesh">Maillage Triangulaire</option>
+                            <option value="diamond">Grille Losange</option>
+                            <option value="hexagonal">Structure Hexagonale</option>
+                            <option value="pentagon">Pentagramme</option>
+                        </optgroup>
+                        <optgroup label="Dynamiques & Optiques">
+                            <option value="diagonal_method">Méthode Diagonale</option>
+                            <option value="rabatment">Rabatment du Carré</option>
+                            <option value="spiral">Spirale d'Or</option>
+                            <option value="optical_center">Point Optique</option>
+                            <option value="radial_rays">Rayonnement Radial</option>
+                        </optgroup>
+                    </select>
+                </div>
+
+                <div id="modularParams">
+                    <div class="dimensions-row">
+                        <div class="input-group"><label>Cols</label><input type="number" id="colsInput" value="12"></div>
+                        <div class="input-group"><label>Rangs</label><input type="number" id="rowsInput" value="8"></div>
+                    </div>
+                    <div class="input-group"><label>Gouttière (mm)</label><input type="number" id="gutterInput" value="5"></div>
+                </div>
+
+                <div class="history-controls">
+                    <button id="undoBtn" class="control-btn" title="Annuler (Ctrl+Z)"><i data-lucide="undo-2"></i></button>
+                    <button id="redoBtn" class="control-btn" title="Rétablir (Ctrl+Y)"><i data-lucide="redo-2"></i></button>
+                    <span style="font-size: 0.7rem; color: var(--text-dim); display: flex; align-items: center;">Historique</span>
+                </div>
+            </section>
+
+            <section class="export-section">
+                <h3><i data-lucide="download"></i> Exportation</h3>
+                <div class="btn-stack">
+                    <button class="btn" onclick="exportPNG()"><i data-lucide="image"></i> Télécharger PNG</button>
+                    <button class="btn btn-outline" onclick="exportJSX('id')">InDesign (.jsx)</button>
+                    <button class="btn btn-outline" onclick="exportJSX('ai')">Illustrator (.jsx)</button>
+                    <button class="btn btn-outline" onclick="exportJSX('ps')">Photoshop (.jsx)</button>
+                </div>
+            </section>
+        </aside>
+
+        <main class="preview-area" id="viewPort">
+            <div class="interaction-hint">Glissez les guides / Scroll souris pour zoomer</div>
+            <div class="zoom-controls">
+                <button class="control-btn" onclick="zoom(0.1)" title="Zoom +"><i data-lucide="zoom-in"></i></button>
+                <button class="control-btn" onclick="zoom(-0.1)" title="Zoom -"><i data-lucide="zoom-out"></i></button>
+                <button class="control-btn" onclick="resetView()" title="Reset"><i data-lucide="maximize"></i></button>
+            </div>
+            <div id="canvasWrapper">
+                <div class="canvas-container" id="canvasContainer">
+                    <canvas id="gridCanvas"></canvas>
+                </div>
+            </div>
+            <div class="canvas-info" id="dimInfo">210 x 297 mm</div>
+        </main>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        const PHI = 1.61803398875;
+        const canvas = document.getElementById('gridCanvas');
+        const ctx = canvas.getContext('2d');
+        const viewPort = document.getElementById('viewPort');
+        const wrapper = document.getElementById('canvasWrapper');
+        const container = document.getElementById('canvasContainer');
+
+        const ui = {
+            width: document.getElementById('widthInput'),
+            height: document.getElementById('heightInput'),
+            system: document.getElementById('gridSystem'),
+            cols: document.getElementById('colsInput'),
+            rows: document.getElementById('rowsInput'),
+            gutter: document.getElementById('gutterInput'),
+            presets: document.getElementById('formatPresets'),
+            dimInfo: document.getElementById('dimInfo'),
+            undo: document.getElementById('undoBtn'),
+            redo: document.getElementById('redoBtn')
+        };
+
+        let transform = { x: 0, y: 0, scale: 0.6 };
+        let state = { guidesV: [], guidesH: [], shapes: [] };
+        let history = [];
+        let historyIndex = -1;
+
+        function saveHistory() {
+            if (historyIndex < history.length - 1) history = history.slice(0, historyIndex + 1);
+            history.push({ guidesV: [...state.guidesV], guidesH: [...state.guidesH] });
+            if (history.length > 50) history.shift();
+            historyIndex = history.length - 1;
+            updateHistoryButtons();
+        }
+
+        function undo() { if (historyIndex > 0) { historyIndex--; applyHistoryState(); } }
+        function redo() { if (historyIndex < history.length - 1) { historyIndex++; applyHistoryState(); } }
+
+        function applyHistoryState() {
+            const hist = history[historyIndex];
+            state.guidesV = [...hist.guidesV];
+            state.guidesH = [...hist.guidesH];
+            render(parseFloat(ui.width.value), parseFloat(ui.height.value));
+            updateHistoryButtons();
+        }
+
+        function updateHistoryButtons() {
+            ui.undo.disabled = historyIndex <= 0;
+            ui.redo.disabled = historyIndex >= history.length - 1;
+        }
+
+        let selectedGuide = null;
+        let isNavigating = false;
+        let lastPointer = { x: 0, y: 0 };
+        const HIT_DISTANCE = 5;
+
+        function updateTransform() { wrapper.style.transform = `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`; }
+        function zoom(delta) { transform.scale = Math.max(0.05, Math.min(10, transform.scale + delta)); updateTransform(); }
+        function resetView() { transform = { x: 0, y: 0, scale: 0.6 }; updateTransform(); }
+
+        // REACTIVE ZOOM SUR SCROLL
+        viewPort.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -0.05 : 0.05;
+            zoom(delta);
+        }, { passive: false });
+
+        canvas.addEventListener('pointerdown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const w = parseFloat(ui.width.value);
+            const h = parseFloat(ui.height.value);
+            const mouseX = (e.clientX - rect.left) / (rect.width / w);
+            const mouseY = (e.clientY - rect.top) / (rect.height / h);
+
+            let foundV = state.guidesV.findIndex(x => Math.abs(x - mouseX) < (HIT_DISTANCE / transform.scale));
+            if (foundV !== -1) { selectedGuide = { type: 'V', index: foundV }; canvas.setPointerCapture(e.pointerId); return; }
+
+            let foundH = state.guidesH.findIndex(y => Math.abs(y - mouseY) < (HIT_DISTANCE / transform.scale));
+            if (foundH !== -1) { selectedGuide = { type: 'H', index: foundH }; canvas.setPointerCapture(e.pointerId); return; }
+
+            isNavigating = true;
+            lastPointer = { x: e.clientX, y: e.clientY };
+        });
+
+        canvas.addEventListener('pointermove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const w = parseFloat(ui.width.value);
+            const h = parseFloat(ui.height.value);
+
+            if (selectedGuide) {
+                const mouseX = (e.clientX - rect.left) / (rect.width / w);
+                const mouseY = (e.clientY - rect.top) / (rect.height / h);
+                if (selectedGuide.type === 'V') state.guidesV[selectedGuide.index] = Math.max(0, Math.min(w, mouseX));
+                else state.guidesH[selectedGuide.index] = Math.max(0, Math.min(h, mouseY));
+                render(w, h);
+                return;
+            }
+
+            if (isNavigating) {
+                transform.x += (e.clientX - lastPointer.x);
+                transform.y += (e.clientY - lastPointer.y);
+                lastPointer = { x: e.clientX, y: e.clientY };
+                updateTransform();
+                return;
+            }
+
+            const mouseX = (e.clientX - rect.left) / (rect.width / w);
+            const mouseY = (e.clientY - rect.top) / (rect.height / h);
+            const nearV = state.guidesV.some(x => Math.abs(x - mouseX) < (HIT_DISTANCE / transform.scale));
+            const nearH = state.guidesH.some(y => Math.abs(y - mouseY) < (HIT_DISTANCE / transform.scale));
+            canvas.style.cursor = nearV ? 'col-resize' : (nearH ? 'row-resize' : 'crosshair');
+        });
+
+        canvas.addEventListener('pointerup', (e) => {
+            if (selectedGuide) saveHistory();
+            selectedGuide = null;
+            isNavigating = false;
+            canvas.releasePointerCapture(e.pointerId);
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); }
+        });
+
+        ui.undo.addEventListener('click', undo);
+        ui.redo.addEventListener('click', redo);
+
+        function calculate(w, h, type) {
+            state = { guidesV: [], guidesH: [], shapes: [] };
+            const diag = Math.sqrt(w*w + h*h);
+            const m = Math.min(w, h);
+
+            switch(type) {
+                case 'modular':
+                    const cols = Math.max(1, parseInt(ui.cols.value) || 1);
+                    const rows = Math.max(1, parseInt(ui.rows.value) || 1);
+                    const g = parseFloat(ui.gutter.value) || 0;
+                    const cw = (w - (g * (cols - 1))) / cols;
+                    const rh = (h - (g * (rows - 1))) / rows;
+                    for(let i=0; i<cols; i++) { 
+                        let x = i*(cw+g); 
+                        if (i>0) state.guidesV.push(x - g); 
+                        state.guidesV.push(x);
+                    }
+                    state.guidesV.push(w);
+                    for(let i=0; i<rows; i++) { 
+                        let y = i*(rh+g); 
+                        if (i>0) state.guidesH.push(y - g); 
+                        state.guidesH.push(y);
+                    }
+                    state.guidesH.push(h);
+                    break;
+                case 'golden': 
+                    state.guidesV = [w/PHI, w - w/PHI]; 
+                    state.guidesH = [h/PHI, h - h/PHI]; 
+                    break;
+                case 'thirds': 
+                    state.guidesV = [w/3, (w*2)/3]; 
+                    state.guidesH = [h/3, (h*2)/3]; 
+                    break;
+                case 'villard': 
+                    state.guidesV = [w/9, w/3, w*2/3, w*8/9]; 
+                    state.guidesH = [h/9, h/3, h*2/3, h*8/9]; 
+                    state.shapes.push({type:'line', x1:0, y1:0, x2:w, y2:h}, {type:'line', x1:w, y1:0, x2:0, y2:h});
+                    break;
+                case 'van_de_graaf':
+                    state.shapes.push({type:'line', x1:0, y1:0, x2:w, y2:h}, {type:'line', x1:w, y1:0, x2:0, y2:h}, {type:'line', x1:w/2, y1:0, x2:w/2, y2:h});
+                    state.guidesV = [w/9, w/6, w*2/3, w*5/6];
+                    state.guidesH = [h/9, h/6, h*2/3, h*5/6];
+                    break;
+                case 'root2': 
+                    state.guidesV = [w/1.414, w - w/1.414]; 
+                    state.guidesH = [h/1.414, h - h/1.414]; 
+                    break;
+                case 'fibonacci':
+                    let f=[1,1,2,3,5,8,13,21]; let s=f.reduce((a,b)=>a+b,0); let cv=0, ch=0;
+                    f.forEach(v=>{ cv+=(v/s)*w; ch+=(v/s)*h; state.guidesV.push(cv); state.guidesH.push(ch); });
+                    break;
+                case 'circle_center':
+                    for(let i=1; i<=10; i++) state.shapes.push({type:'circle', x:w/2, y:h/2, r:(m/20)*i*2});
+                    break;
+                case 'vesica':
+                    const r = m/4;
+                    state.shapes.push({type:'circle', x:w/2-r/2, y:h/2, r}, {type:'circle', x:w/2+r/2, y:h/2, r});
+                    break;
+                case 'triangle_mesh':
+                    for(let i=0; i<=4; i++){
+                        state.shapes.push({type:'line', x1:w*i/4, y1:0, x2:w/2, y2:h}, {type:'line', x1:w*i/4, y1:h, x2:w/2, y2:0});
+                    }
+                    break;
+                case 'diamond':
+                    state.shapes.push({type:'line', x1:w/2, y1:0, x2:0, y2:h/2}, {type:'line', x1:0, y1:h/2, x2:w/2, y2:h}, {type:'line', x1:w/2, y1:h, x2:w, y2:h/2}, {type:'line', x1:w, y1:h/2, x2:w/2, y2:0});
+                    break;
+                case 'hexagonal':
+                    const hexR = m/10;
+                    for(let i=-1; i<12; i++) for(let j=-1; j<12; j++) {
+                        let cx = i*hexR*1.5; let cy = j*hexR*1.732 + (i%2?hexR*0.866:0);
+                        state.shapes.push({type:'poly', cx, cy, r:hexR, s:6});
+                    }
+                    break;
+                case 'pentagon':
+                    state.shapes.push({type:'poly', cx:w/2, cy:h/2, r:m/3, s:5});
+                    break;
+                case 'diagonal_method':
+                    state.shapes.push({type:'line', x1:0, y1:0, x2:w, y2:h}, {type:'line', x1:w, y1:0, x2:0, y2:h});
+                    state.guidesV = [m, w-m];
+                    break;
+                case 'rabatment':
+                    state.guidesV = [m, w-m];
+                    state.guidesH = [m, h-m];
+                    break;
+                case 'spiral':
+                    state.shapes.push({type:'spiral', w, h});
+                    break;
+                case 'optical_center':
+                    state.guidesV=[w/2]; state.guidesH=[h/2, h*0.382];
+                    state.shapes.push({type:'circle', x:w/2, y:h*0.382, r:2});
+                    break;
+                case 'radial_rays':
+                    for(let i=0; i<12; i++){
+                        let a = (i/12)*Math.PI*2;
+                        state.shapes.push({type:'line', x1:w/2, y1:h/2, x2:w/2+Math.cos(a)*diag, y2:h/2+Math.sin(a)*diag});
+                    }
+                    break;
+            }
+        }
+
+        function render(w, h) {
+            container.style.width = w + 'mm';
+            container.style.height = h + 'mm';
+            const scale = 4;
+            canvas.width = w * scale; canvas.height = h * scale;
+            ctx.clearRect(0,0, canvas.width, canvas.height);
+            ctx.scale(scale, scale);
+
+            // Dessin des formes de construction (Gris sombre)
+            ctx.lineWidth = 0.2;
+            ctx.strokeStyle = '#d0d7de';
+            state.shapes.forEach(s => {
+                ctx.beginPath();
+                if(s.type==='line') { ctx.moveTo(s.x1, s.y1); ctx.lineTo(s.x2, s.y2); }
+                else if(s.type==='circle') { ctx.arc(s.x, s.y, s.r, 0, Math.PI*2); }
+                else if(s.type==='poly') {
+                    for(let i=0; i<s.s; i++){
+                        let a = (i/s.s)*Math.PI*2 - Math.PI/2;
+                        let px = s.cx + Math.cos(a)*s.r; let py = s.cy + Math.sin(a)*s.r;
+                        if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+                    }
+                    ctx.closePath();
+                }
+                else if(s.type==='spiral'){
+                    let sw=s.w, sh=s.h, sx=0, sy=0;
+                    for(let i=0; i<10; i++){
+                        ctx.rect(sx, sy, sw, sh);
+                        // Logique de spirale simplifiée
+                        if(i%4===0) { sx += sw/PHI; sw -= sw/PHI; }
+                        else if(i%4===1) { sy += sh/PHI; sh -= sh/PHI; }
+                        else if(i%4===2) { sw -= sw/PHI; }
+                        else { sh -= sh/PHI; }
+                    }
+                }
+                ctx.stroke();
+            });
+
+            // Dessin des guides actifs (Cyan Photoshop)
+            ctx.lineWidth = 0.4;
+            state.guidesV.forEach((x, i) => {
+                ctx.strokeStyle = (selectedGuide?.type === 'V' && selectedGuide?.index === i) ? '#ff00ff' : '#00ffba';
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+            });
+            state.guidesH.forEach((y, i) => {
+                ctx.strokeStyle = (selectedGuide?.type === 'H' && selectedGuide?.index === i) ? '#ff00ff' : '#00ffba';
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+            });
+        }
+
+        function exportPNG() {
+            const link = document.createElement('a');
+            link.download = `Grid_${ui.system.value}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        function exportJSX(app) {
+            const w = ui.width.value;
+            const h = ui.height.value;
+            let script = "";
+            const mmToPt = 2.83465;
+
+            if (app === 'id') {
+                script = `var doc = app.documents.add();\n`;
+                script += `doc.documentPreferences.pageWidth = "${w}mm";\n`;
+                script += `doc.documentPreferences.pageHeight = "${h}mm";\n`;
+                state.guidesV.forEach(x => script += `doc.pages[0].guides.add({location: "${x}mm", orientation: HorizontalOrVertical.VERTICAL});\n`);
+                state.guidesH.forEach(y => script += `doc.pages[0].guides.add({location: "${y}mm", orientation: HorizontalOrVertical.HORIZONTAL});\n`);
+            } else if (app === 'ai') {
+                script = `var doc = app.documents.add(DocumentColorSpace.RGB, ${w*mmToPt}, ${h*mmToPt});\n`;
+                state.guidesV.forEach(x => {
+                    script += `var g = doc.pathItems.add(); g.setEntirePath([[${x*mmToPt}, 0], [${x*mmToPt}, ${h*mmToPt}]]); g.guides = true;\n`;
+                });
+                state.guidesH.forEach(y => {
+                    script += `var g = doc.pathItems.add(); g.setEntirePath([[0, ${(h-y)*mmToPt}], [${w*mmToPt}, ${(h-y)*mmToPt}]]); g.guides = true;\n`;
+                });
+            } else if (app === 'ps') {
+                script = `var doc = app.documents.add(${w*mmToPt}, ${h*mmToPt}, 72, "GridGen Export", NewDocumentMode.RGB);\n`;
+                state.guidesV.forEach(x => script += `doc.guides.add(Direction.VERTICAL, "${x}mm");\n`);
+                state.guidesH.forEach(y => script += `doc.guides.add(Direction.HORIZONTAL, "${y}mm");\n`);
+            }
+
+            const blob = new Blob([script], {type: 'text/plain'});
+            const link = document.createElement('a');
+            link.download = `GridGen_${app}_Export.jsx`;
+            link.href = URL.createObjectURL(blob);
+            link.click();
+        }
+
+        function update() {
+            const w = parseFloat(ui.width.value) || 210;
+            const h = parseFloat(ui.height.value) || 297;
+            document.getElementById('modularParams').style.display = ui.system.value === 'modular' ? 'block' : 'none';
+            ui.dimInfo.innerText = `${w} x ${h} mm`;
+            calculate(w, h, ui.system.value);
+            saveHistory();
+            render(w, h);
+        }
+
+        ui.presets.addEventListener('change', () => {
+            if(ui.presets.value !== 'custom') {
+                const [w, h] = ui.presets.value.split(',');
+                ui.width.value = w; ui.height.value = h;
+            }
+            update();
+        });
+
+        [ui.width, ui.height, ui.system, ui.cols, ui.rows, ui.gutter].forEach(el => el.addEventListener('input', update));
+        update();
+        resetView();
+    </script>
+</body>
+</html>
