@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Adobe Grid Generator Pro</title>
+    <title>Adobe Grid Generator Pro v6.2</title>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         :root {
@@ -15,601 +15,792 @@
             --text-dim: #8b949e;
             --text-light: #ffffff;
             --ps-guide: #00ffba; 
-            --ps-guide-hover: #52ffd3;
-            --ps-selection: #ff00ff;
+            --accent: #58a6ff;
+            --warning: #ffab70;
+            --safe-zone-color: #ff00ff;
         }
 
-        * { box-sizing: border-box; touch-action: none; }
-
-        body, html {
-            margin: 0; padding: 0; height: 100%;
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            background-color: var(--bg-deep);
-            color: var(--text-main);
-            overflow: hidden;
-        }
-
+        * { box-sizing: border-box; }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Inter', -apple-system, sans-serif; background-color: var(--bg-deep); color: var(--text-main); overflow: hidden; }
         #app { display: flex; height: 100vh; }
 
-        .sidebar {
-            width: 380px;
-            background-color: var(--bg-side);
-            border-right: 1px solid var(--border-color);
-            padding: 1.5rem;
-            display: flex;
-            flex-direction: column;
-            overflow-y: auto;
-            z-index: 10;
-        }
-
-        h1 { font-size: 1.5rem; margin: 0; }
+        /* Sidebar */
+        .sidebar { width: 380px; background-color: var(--bg-side); border-right: 1px solid var(--border-color); padding: 1.25rem; display: flex; flex-direction: column; overflow-y: auto; z-index: 10; }
+        .header-brand { margin-bottom: 1.5rem; }
+        h1 { font-size: 1.1rem; margin: 0; font-weight: 800; letter-spacing: -0.5px; }
         .text-guide { color: var(--ps-guide); }
-        .subtitle { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 2rem; }
+        .subtitle { font-size: 0.65rem; color: var(--text-dim); margin-top: 4px; text-transform: uppercase; letter-spacing: 1px; }
 
-        .config-section { margin-bottom: 2rem; }
-        .config-section h3 {
-            font-size: 0.8rem; text-transform: uppercase;
-            color: var(--text-dim); display: flex; align-items: center;
-            gap: 8px; margin-bottom: 1rem;
-            letter-spacing: 1px;
-        }
+        .config-section { margin-bottom: 1.25rem; background: rgba(255,255,255,0.03); padding: 1rem; border-radius: 10px; border: 1px solid var(--border-color); }
+        .config-section h3 { font-size: 0.7rem; text-transform: uppercase; color: var(--text-light); display: flex; align-items: center; gap: 8px; margin-bottom: 1rem; margin-top: 0; opacity: 0.8; }
 
-        .input-group { margin-bottom: 1rem; }
-        label { display: block; font-size: 0.75rem; margin-bottom: 0.4rem; color: var(--text-dim); }
+        .input-group { margin-bottom: 0.8rem; }
+        .input-wrapper { display: flex; align-items: center; gap: 5px; width: 100%; }
+        .unit-label { font-size: 0.7rem; color: var(--text-dim); min-width: 25px; }
+        
+        label { display: block; font-size: 0.65rem; margin-bottom: 0.3rem; color: var(--text-dim); font-weight: 600; }
+        .label-with-value { display: flex; justify-content: space-between; align-items: center; }
+        .value-badge { font-family: monospace; color: var(--ps-guide); font-size: 0.7rem; }
 
-        select, input {
-            width: 100%; background: var(--bg-card);
-            border: 1px solid var(--border-color); color: var(--text-main);
-            padding: 0.6rem; border-radius: 6px; outline: none;
-            font-size: 0.9rem;
-        }
-
+        select, input { width: 100%; background: var(--bg-deep); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.5rem; border-radius: 6px; font-size: 0.8rem; outline: none; transition: border 0.2s; }
         select:focus, input:focus { border-color: var(--ps-guide); }
+        
         .dimensions-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
-        .preview-area {
-            flex: 1; position: relative;
-            background: radial-gradient(circle, #1c2128 0%, #0f1218 100%);
-            overflow: hidden;
-            display: flex; align-items: center; justify-content: center;
+        /* Canvas Area */
+        .preview-area { 
+            flex: 1; 
+            position: relative; 
+            background: #0d1117; 
+            overflow: hidden; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            cursor: grab;
+            padding: 100px;
         }
+        .preview-area:active { cursor: grabbing; }
 
-        #canvasWrapper {
-            transform-origin: center;
+        #canvasWrapper { 
+            position: absolute; 
+            transform-origin: center; 
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             will-change: transform;
-            display: flex; align-items: center; justify-content: center;
-        }
-
-        .canvas-container {
-            position: relative;
-            box-shadow: 0 0 50px rgba(0,0,0,0.8);
-            background: #ffffff;
-        }
-
-        canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
-
-        .canvas-info {
-            position: absolute; bottom: 20px; left: 50%;
-            transform: translateX(-50%);
-            font-size: 0.75rem; color: var(--text-dim);
-            background: rgba(0,0,0,0.6); padding: 6px 16px; border-radius: 20px;
-            backdrop-filter: blur(8px); pointer-events: none;
-            z-index: 5;
-        }
-
-        .zoom-controls {
-            position: absolute; top: 20px; right: 20px;
-            display: flex; flex-direction: column; gap: 8px;
-            z-index: 5;
-        }
-
-        .control-btn {
-            width: 40px; height: 40px;
-            background: var(--bg-card); border: 1px solid var(--border-color);
-            color: var(--text-main); border-radius: 8px;
-            display: flex; align-items: center; justify-content: center;
-            cursor: pointer; transition: 0.2s;
-        }
-        .control-btn:hover:not(:disabled) { background: var(--ps-guide); color: var(--bg-deep); }
-        .control-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-
-        .history-controls {
             display: flex;
-            gap: 10px;
-            margin-top: 1rem;
+            align-items: center;
+            justify-content: center;
+        }
+        .canvas-container { 
+            position: relative; 
+            box-shadow: 0 30px 80px rgba(0,0,0,0.8); 
+            background: #ffffff; 
+            transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        canvas { display: block; width: 100%; height: 100%; }
+
+        /* Zoom & History Controls */
+        .zoom-controls { position: absolute; bottom: 30px; right: 30px; display: flex; gap: 8px; z-index: 20; }
+        .history-controls { position: absolute; bottom: 75px; left: 30px; display: flex; flex-direction: column; gap: 6px; z-index: 20; }
+        
+        .control-btn { width: 40px; height: 40px; background: var(--bg-side); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
+        .control-btn:hover { background: var(--bg-card); border-color: var(--ps-guide); color: var(--ps-guide); }
+        .control-btn:disabled { opacity: 0.3; cursor: not-allowed; border-color: var(--border-color); color: var(--text-dim); }
+
+        /* Zoom Indicator Bottom Left */
+        .zoom-indicator {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            background: rgba(22, 27, 34, 0.8);
+            border: 1px solid var(--border-color);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-dim);
+            pointer-events: none;
+            z-index: 20;
+            backdrop-filter: blur(4px);
         }
 
-        .btn-stack { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 10px; }
-        .btn {
-            padding: 0.75rem; border: none; border-radius: 6px;
-            font-weight: 600; cursor: pointer; transition: all 0.2s; color: var(--bg-deep);
-            display: flex; align-items: center; justify-content: center; gap: 8px;
-            background-color: var(--ps-guide);
-            font-size: 0.85rem;
+        /* Badge Info Style Figma */
+        .figma-badge { 
+            position: absolute; 
+            left: 0; 
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 6px;
+            pointer-events: none;
+            white-space: nowrap;
+            transform-origin: left bottom;
         }
-        .btn:hover { background-color: var(--ps-guide-hover); transform: translateY(-1px); }
-        .btn-outline {
-            background: transparent; border: 1px solid var(--ps-guide); color: var(--ps-guide);
-        }
-        .btn-outline:hover { background: rgba(0,255,186,0.1); }
+        .badge-header { display: flex; align-items: center; gap: 8px; }
+        .badge-label { font-size: 11px; font-weight: 600; color: var(--ps-guide); background: rgba(0, 255, 186, 0.1); padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(0, 255, 186, 0.2); font-family: 'Inter', sans-serif; }
+        .badge-dimensions { font-size: 11px; font-weight: 400; color: var(--text-dim); font-family: 'Inter', sans-serif; }
+        .badge-grid-info { font-size: 10px; font-weight: 500; color: var(--text-dim); font-family: 'Inter', sans-serif; letter-spacing: 0.2px; margin-left: 2px; display: flex; gap: 6px; }
+
+        .export-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .export-btn { background: #2d333b; color: white; border: 1px solid var(--border-color); padding: 10px; border-radius: 6px; font-size: 0.7rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s; }
+        .export-btn:hover { background: var(--ps-guide); color: #000; }
         
-        .interaction-hint {
-            position: absolute; top: 20px; left: 20px;
-            font-size: 0.7rem; color: var(--ps-guide);
-            background: rgba(0,0,0,0.4); padding: 5px 10px; border-radius: 4px;
-        }
+        .success-dialog { position: fixed; bottom: -150px; left: 50%; transform: translateX(-50%); background-color: var(--ps-guide); color: #000; padding: 1rem 2rem; border-radius: 12px; z-index: 1001; font-weight: 700; transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); opacity: 0; }
+        .success-dialog.active { bottom: 40px; opacity: 1; }
+        #bleedContainer { display: none; }
+
+        /* Image section styling */
+        .file-upload-btn { background: var(--bg-deep); border: 1px dashed var(--border-color); color: var(--text-dim); padding: 0.8rem; width: 100%; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.75rem; transition: all 0.2s; }
+        .file-upload-btn:hover { border-color: var(--ps-guide); color: var(--ps-guide); }
+        .file-upload-btn.has-file { border-color: #ff4a4a; color: #ff4a4a; border-style: solid; }
+        .file-upload-btn.has-file:hover { background: rgba(255, 74, 74, 0.1); }
+        #bgImageInput { display: none; }
+        .helper-text { font-size: 0.6rem; color: var(--text-dim); margin-top: 6px; font-style: italic; }
+        
+        .warning-text { font-size: 0.65rem; color: var(--warning); margin-top: 10px; display: none; align-items: flex-start; gap: 6px; line-height: 1.3; }
     </style>
 </head>
 <body>
     <div id="app">
         <aside class="sidebar">
-            <header>
-                <h1 class="text-guide">GridGen<span style="color:var(--text-light)">.pro</span></h1>
-                <p class="subtitle">Systèmes de Grilles & Export Adobe</p>
-            </header>
+            <div class="header-brand">
+                <h1 class="text-guide">GRIDGEN<span style="color:var(--text-light)">.PRO</span></h1>
+                <p class="subtitle">Mise en Page & Repères Adobe</p>
+            </div>
 
             <section class="config-section">
-                <h3><i data-lucide="layout"></i> Format</h3>
+                <h3><i data-lucide="layout"></i> Format du document</h3>
                 <div class="input-group">
+                    <label>Préréglage</label>
                     <select id="formatPresets">
-                        <option value="210,297">A4 (210 x 297 mm)</option>
-                        <option value="297,420">A3 (297 x 420 mm)</option>
-                        <option value="148,210">A5 (148 x 210 mm)</option>
-                        <option value="420,594">A2 (420 x 594 mm)</option>
-                        <option value="210,210">Carré (210 x 210 mm)</option>
-                        <option value="600,2000">Roll-up (600 x 2000 mm)</option>
-                        <option value="1080,1080">Instagram (1080px)</option>
+                        <optgroup label="PRINT (mm)">
+                            <option value="print,210,297,3,A4">A4 (210x297)</option>
+                            <option value="print,297,420,3,A3">A3 (297x420)</option>
+                            <option value="print,148,210,3,A5">A5 (148x210)</option>
+                            <option value="print,105,148,3,A6">A6 (105x148)</option>
+                            <option value="print,420,594,3,A2">A2 (420x594)</option>
+                            <option value="print,850,2000,0,Kakemono">Kakémono (850x2000)</option>
+                        </optgroup>
+                        <optgroup label="WEB (px)">
+                            <option value="web,1920,1080,0,FullHD">Full HD (16:9 - 1920x1080)</option>
+                            <option value="web,1080,1080,0,InstaSquare">Insta Carré (1:1 - 1080x1080)</option>
+                            <option value="web,1080,1350,0,InstaPortrait">Insta Portrait (4:5 - 1080x1350)</option>
+                            <option value="web,1080,1920,0,TikTok">Story / TikTok (9:16 - 1080x1920)</option>
+                            <option value="web,851,315,0,FB_Cover">Facebook Cover (2.7:1 - 851x315)</option>
+                            <option value="web,1500,500,0,X_Cover">X / Twitter Cover (3:1 - 1500x500)</option>
+                        </optgroup>
                         <option value="custom">Personnalisé</option>
                     </select>
                 </div>
                 <div class="dimensions-row">
-                    <div class="input-group"><label>L (mm/px)</label><input type="number" id="widthInput" value="210"></div>
-                    <div class="input-group"><label>H (mm/px)</label><input type="number" id="heightInput" value="297"></div>
+                    <div class="input-group">
+                        <label>Largeur</label>
+                        <div class="input-wrapper">
+                            <input type="number" id="widthInput" value="210">
+                            <span class="unit-label doc-unit">mm</span>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>Hauteur</label>
+                        <div class="input-wrapper">
+                            <input type="number" id="heightInput" value="297">
+                            <span class="unit-label doc-unit">mm</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="input-group" id="bleedContainer">
+                    <label>Fonds perdus</label>
+                    <div class="input-wrapper">
+                        <input type="number" id="bleedInput" value="3" min="0">
+                        <span class="unit-label doc-unit">mm</span>
+                    </div>
                 </div>
             </section>
 
             <section class="config-section">
-                <h3><i data-lucide="grid"></i> Composition</h3>
+                <h3><i data-lucide="grid-3x3"></i> Système de Grille</h3>
                 <div class="input-group">
                     <select id="gridSystem">
-                        <optgroup label="Modulaire">
-                            <option value="modular">Grille Modulaire</option>
-                        </optgroup>
-                        <optgroup label="Classiques & Harmoniques">
-                            <option value="golden">Nombre d'Or (Φ)</option>
-                            <option value="thirds">Règle des Tiers</option>
-                            <option value="villard">Villard de Honnecourt</option>
-                            <option value="van_de_graaf">Van de Graaf</option>
-                            <option value="root2">Ratio √2</option>
-                            <option value="fibonacci">Séquence Fibonacci</option>
-                        </optgroup>
-                        <optgroup label="Géométriques & Sacrés">
-                            <option value="circle_center">Cercles Concentriques</option>
-                            <option value="vesica">Vesica Piscis</option>
-                            <option value="triangle_mesh">Maillage Triangulaire</option>
-                            <option value="diamond">Grille Losange</option>
-                            <option value="hexagonal">Structure Hexagonale</option>
-                            <option value="pentagon">Pentagramme</option>
-                        </optgroup>
-                        <optgroup label="Dynamiques & Optiques">
-                            <option value="diagonal_method">Méthode Diagonale</option>
-                            <option value="rabatment">Rabatment du Carré</option>
-                            <option value="spiral">Spirale d'Or</option>
-                            <option value="optical_center">Point Optique</option>
-                            <option value="radial_rays">Rayonnement Radial</option>
-                        </optgroup>
+                        <option value="modular">Grille Modulaire</option>
+                        <option value="isometric">Grille Isométrique</option>
+                        <option value="golden_section">Section d'Or (Grille PHI)</option>
+                        <option value="columns">Colonnes & Gouttières</option>
+                        <option value="vandegraaf">Canon de Van de Graaf</option>
+                        <option value="diagonal">Diagonales & Médianes</option>
+                        <option value="dots">Grille de Points</option>
+                        <option value="rule_of_thirds">Règle des Tiers</option>
                     </select>
                 </div>
 
-                <div id="modularParams">
-                    <div class="dimensions-row">
-                        <div class="input-group"><label>Cols</label><input type="number" id="colsInput" value="12"></div>
-                        <div class="input-group"><label>Rangs</label><input type="number" id="rowsInput" value="8"></div>
+                <div id="gridControls">
+                    <div class="dimensions-row" id="divisionControls">
+                        <div class="input-group">
+                            <label>Colonnes / X</label>
+                            <input type="number" id="colsInput" value="12">
+                        </div>
+                        <div class="input-group">
+                            <label>Rangs / Y</label>
+                            <input type="number" id="rowsInput" value="8">
+                        </div>
                     </div>
-                    <div class="input-group"><label>Gouttière (mm)</label><input type="number" id="gutterInput" value="5"></div>
+                    <div class="input-group" id="gutterContainer">
+                        <label>Gouttière</label>
+                        <div class="input-wrapper">
+                            <input type="number" id="gutterInput" value="5">
+                            <span class="unit-label doc-unit">mm</span>
+                        </div>
+                    </div>
+                    <div class="input-group" id="isoScaleContainer" style="display:none">
+                        <label class="label-with-value">Densité <span class="value-badge" id="isoValDisplay">100%</span></label>
+                        <input type="range" id="isoScaleInput" min="10" max="250" value="60">
+                    </div>
                 </div>
-
-                <div class="history-controls">
-                    <button id="undoBtn" class="control-btn" title="Annuler (Ctrl+Z)"><i data-lucide="undo-2"></i></button>
-                    <button id="redoBtn" class="control-btn" title="Rétablir (Ctrl+Y)"><i data-lucide="redo-2"></i></button>
-                    <span style="font-size: 0.7rem; color: var(--text-dim); display: flex; align-items: center;">Historique</span>
+                
+                <div class="warning-text" id="gridWarning">
+                    <i data-lucide="alert-triangle" style="width:14px; flex-shrink:0;"></i>
+                    <span>Cette grille n'est pas gérée nativement par les repères Photoshop. Utilisez l'export PNG pour l'importer comme calque.</span>
                 </div>
             </section>
 
-            <section class="export-section">
-                <h3><i data-lucide="download"></i> Exportation</h3>
-                <div class="btn-stack">
-                    <button class="btn" onclick="exportPNG()"><i data-lucide="image"></i> Télécharger PNG</button>
-                    <button class="btn btn-outline" onclick="exportJSX('id')">InDesign (.jsx)</button>
-                    <button class="btn btn-outline" onclick="exportJSX('ai')">Illustrator (.jsx)</button>
-                    <button class="btn btn-outline" onclick="exportJSX('ps')">Photoshop (.jsx)</button>
+            <section class="config-section">
+                <h3><i data-lucide="image"></i> Image d'arrière plan</h3>
+                <div class="input-group">
+                    <div id="bgImageBtn" class="file-upload-btn" onclick="handleImageAction()">
+                        <i id="imageBtnIcon" data-lucide="upload-cloud" style="width:16px;"></i>
+                        <span id="imageBtnText">Charger une image</span>
+                    </div>
+                    <input type="file" id="bgImageInput" accept="image/*">
+                </div>
+                <div class="input-group">
+                    <label class="label-with-value">Opacité de l'overlay <span class="value-badge" id="opacityValDisplay">0%</span></label>
+                    <input type="range" id="bgOpacityInput" min="0" max="100" value="0">
+                </div>
+                <p class="helper-text">Cette image ne sera pas exportée.</p>
+            </section>
+
+            <section class="config-section">
+                <h3><i data-lucide="share-2"></i> Exportations</h3>
+                <div class="export-grid">
+                    <button class="export-btn" onclick="runExport('InDesign')">InDesign (.jsx)</button>
+                    <button class="export-btn" onclick="runExport('Illustrator')">Illustrator (.jsx)</button>
+                    <button class="export-btn" onclick="runExport('Photoshop')">Photoshop (.jsx)</button>
+                    <button class="export-btn" onclick="exportPNG()">Procreate (PNG)</button>
                 </div>
             </section>
         </aside>
 
         <main class="preview-area" id="viewPort">
-            <div class="interaction-hint">Glissez sur le fond pour déplacer / Scroll pour zoomer</div>
-            <div class="zoom-controls">
-                <button class="control-btn" onclick="zoom(0.1)" title="Zoom +"><i data-lucide="zoom-in"></i></button>
-                <button class="control-btn" onclick="zoom(-0.1)" title="Zoom -"><i data-lucide="zoom-out"></i></button>
-                <button class="control-btn" onclick="resetView()" title="Reset"><i data-lucide="maximize"></i></button>
-            </div>
             <div id="canvasWrapper">
+                <div class="figma-badge" id="figmaBadge">
+                    <div class="badge-header">
+                        <span class="badge-label" id="badgeFormatName">A4</span>
+                        <span class="badge-dimensions" id="badgeDimText">210 × 297 mm</span>
+                    </div>
+                    <div class="badge-grid-info" id="badgeGridInfo">Grille modulaire • 12 col. • 8 rangs</div>
+                </div>
                 <div class="canvas-container" id="canvasContainer">
                     <canvas id="gridCanvas"></canvas>
                 </div>
             </div>
-            <div class="canvas-info" id="dimInfo">210 x 297 mm</div>
+            
+            <div class="history-controls">
+                <button class="control-btn" id="undoBtn" onclick="undo()" title="Annuler (Ctrl+Z)" disabled><i data-lucide="undo-2"></i></button>
+                <button class="control-btn" id="redoBtn" onclick="redo()" title="Rétablir (Ctrl+Y)" disabled><i data-lucide="redo-2"></i></button>
+            </div>
+
+            <div class="zoom-indicator" id="zoomLevelText">ZOOM: 50%</div>
+
+            <div class="zoom-controls">
+                <button class="control-btn" onclick="resetView()" title="Zoom par défaut"><i data-lucide="maximize"></i></button>
+                <button class="control-btn" onclick="uiZoom(1.1)"><i data-lucide="plus"></i></button>
+                <button class="control-btn" onclick="uiZoom(0.9)"><i data-lucide="minus"></i></button>
+            </div>
         </main>
     </div>
 
+    <div id="successDialog" class="success-dialog">Exportation terminée avec succès !</div>
+
     <script>
         lucide.createIcons();
-        const PHI = 1.61803398875;
+        const MM_TO_PX = 3.7795275591;
         const canvas = document.getElementById('gridCanvas');
         const ctx = canvas.getContext('2d');
-        const viewPort = document.getElementById('viewPort');
-        const wrapper = document.getElementById('canvasWrapper');
         const container = document.getElementById('canvasContainer');
+        const badgeFormatName = document.getElementById('badgeFormatName');
+        const badgeDimText = document.getElementById('badgeDimText');
+        const badgeGridInfo = document.getElementById('badgeGridInfo');
+        const badge = document.getElementById('figmaBadge');
+        const wrapper = document.getElementById('canvasWrapper');
+        const viewPort = document.getElementById('viewPort');
+        const zoomText = document.getElementById('zoomLevelText');
+        const isoValDisplay = document.getElementById('isoValDisplay');
+        const opacityValDisplay = document.getElementById('opacityValDisplay');
 
-        const ui = {
+        const inputs = {
             width: document.getElementById('widthInput'),
             height: document.getElementById('heightInput'),
+            bleed: document.getElementById('bleedInput'),
             system: document.getElementById('gridSystem'),
             cols: document.getElementById('colsInput'),
             rows: document.getElementById('rowsInput'),
             gutter: document.getElementById('gutterInput'),
+            isoScale: document.getElementById('isoScaleInput'),
             presets: document.getElementById('formatPresets'),
-            dimInfo: document.getElementById('dimInfo'),
-            undo: document.getElementById('undoBtn'),
-            redo: document.getElementById('redoBtn')
+            bgImage: document.getElementById('bgImageInput'),
+            bgOpacity: document.getElementById('bgOpacityInput')
         };
 
-        let transform = { x: 0, y: 0, scale: 0.6 };
-        let state = { guidesV: [], guidesH: [], shapes: [] };
+        let scale = 0.5; 
+        let posX = 0;
+        let posY = 0;
+        let isDragging = false;
+        let startX, startY;
+        let currentUnit = 'mm';
+        let currentPresetType = 'print';
+        let specialFormat = null;
+        let bgImageObj = null;
+
+        // History Management
         let history = [];
         let historyIndex = -1;
+        let isRecording = true;
 
-        function saveHistory() {
-            if (historyIndex < history.length - 1) history = history.slice(0, historyIndex + 1);
-            history.push({ guidesV: [...state.guidesV], guidesH: [...state.guidesH], shapes: [...state.shapes] });
+        function saveState() {
+            if (!isRecording) return;
+            const state = {
+                width: inputs.width.value,
+                height: inputs.height.value,
+                system: inputs.system.value,
+                cols: inputs.cols.value,
+                rows: inputs.rows.value,
+                gutter: inputs.gutter.value,
+                isoScale: inputs.isoScale.value,
+                preset: inputs.presets.value,
+                unit: currentUnit
+            };
+            
+            // Si on change quelque chose alors qu'on était revenu en arrière, on tronque le futur
+            if (historyIndex < history.length - 1) {
+                history = history.slice(0, historyIndex + 1);
+            }
+            
+            history.push(JSON.stringify(state));
             if (history.length > 50) history.shift();
             historyIndex = history.length - 1;
             updateHistoryButtons();
         }
 
-        function undo() { if (historyIndex > 0) { historyIndex--; applyHistoryState(); } }
-        function redo() { if (historyIndex < history.length - 1) { historyIndex++; applyHistoryState(); } }
-
-        function applyHistoryState() {
-            const hist = history[historyIndex];
-            state.guidesV = [...hist.guidesV];
-            state.guidesH = [...hist.guidesH];
-            render(parseFloat(ui.width.value), parseFloat(ui.height.value));
-            updateHistoryButtons();
-        }
-
         function updateHistoryButtons() {
-            ui.undo.disabled = historyIndex <= 0;
-            ui.redo.disabled = historyIndex >= history.length - 1;
+            document.getElementById('undoBtn').disabled = historyIndex <= 0;
+            document.getElementById('redoBtn').disabled = historyIndex >= history.length - 1;
         }
 
-        let isNavigating = false;
-        let lastPointer = { x: 0, y: 0 };
+        function undo() {
+            if (historyIndex > 0) {
+                historyIndex--;
+                applyState(JSON.parse(history[historyIndex]));
+            }
+        }
 
-        function updateTransform() { wrapper.style.transform = `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`; }
-        function zoom(delta) { transform.scale = Math.max(0.05, Math.min(10, transform.scale + delta)); updateTransform(); }
-        function resetView() { transform = { x: 0, y: 0, scale: 0.6 }; updateTransform(); }
+        function redo() {
+            if (historyIndex < history.length - 1) {
+                historyIndex++;
+                applyState(JSON.parse(history[historyIndex]));
+            }
+        }
+
+        function applyState(state) {
+            isRecording = false;
+            inputs.width.value = state.width;
+            inputs.height.value = state.height;
+            inputs.system.value = state.system;
+            inputs.cols.value = state.cols;
+            inputs.rows.value = state.rows;
+            inputs.gutter.value = state.gutter;
+            inputs.isoScale.value = state.isoScale;
+            inputs.presets.value = state.preset;
+            currentUnit = state.unit;
+            
+            updateDocument();
+            updateHistoryButtons();
+            isRecording = true;
+        }
+
+        // Image Management
+        function handleImageAction() {
+            const btn = document.getElementById('bgImageBtn');
+            if (bgImageObj) {
+                // Suppression
+                bgImageObj = null;
+                inputs.bgImage.value = '';
+                updateImageBtnUI(false);
+                render();
+            } else {
+                // Chargement
+                inputs.bgImage.click();
+            }
+        }
+
+        function updateImageBtnUI(hasImage) {
+            const btn = document.getElementById('bgImageBtn');
+            const icon = document.getElementById('imageBtnIcon');
+            const text = document.getElementById('imageBtnText');
+            
+            if (hasImage) {
+                btn.classList.add('has-file');
+                text.textContent = "Supprimer l'image";
+                icon.setAttribute('data-lucide', 'trash-2');
+            } else {
+                btn.classList.remove('has-file');
+                text.textContent = "Charger une image";
+                icon.setAttribute('data-lucide', 'upload-cloud');
+            }
+            lucide.createIcons();
+        }
+
+        function updateTransform() {
+            wrapper.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
+            if (badge) {
+                badge.style.transform = `scale(${1/scale})`;
+                const badgeHeightEstimate = 38; 
+                badge.style.top = `${-(badgeHeightEstimate + 5) / scale}px`;
+            }
+            zoomText.textContent = `ZOOM: ${Math.round(scale * 100)}%`;
+        }
+
+        function uiZoom(f) {
+            scale *= f;
+            scale = Math.max(0.01, Math.min(scale, 10));
+            updateTransform();
+        }
+
+        function resetView() {
+            autoFitZoom();
+        }
+
+        function autoFitZoom() {
+            const w = parseFloat(inputs.width.value) || 100;
+            const h = parseFloat(inputs.height.value) || 100;
+            const factor = currentUnit === 'mm' ? MM_TO_PX : 1;
+            const wPx = w * factor;
+            const hPx = h * factor;
+
+            let targetScale = 0.5;
+            const vpW = viewPort.clientWidth - 150;
+            const vpH = viewPort.clientHeight - 150;
+            const fitScale = Math.min(vpW / wPx, vpH / hPx);
+
+            if (targetScale > fitScale) {
+                scale = fitScale;
+            } else {
+                scale = targetScale;
+            }
+
+            posX = 0;
+            posY = 0;
+            updateTransform();
+        }
+
+        viewPort.addEventListener('mousedown', (e) => {
+            if (e.button === 0 || e.button === 2) { 
+                isDragging = true;
+                startX = e.clientX - posX;
+                startY = e.clientY - posY;
+                e.preventDefault();
+            }
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            posX = e.clientX - startX;
+            posY = e.clientY - startY;
+            updateTransform();
+        });
+
+        window.addEventListener('mouseup', () => isDragging = false);
+        viewPort.addEventListener('contextmenu', (e) => e.preventDefault());
 
         viewPort.addEventListener('wheel', (e) => {
-            e.preventDefault();
-            const delta = e.deltaY > 0 ? -0.05 : 0.05;
-            zoom(delta);
-        }, { passive: false });
-
-        canvas.addEventListener('pointerdown', (e) => {
-            isNavigating = true;
-            lastPointer = { x: e.clientX, y: e.clientY };
-            canvas.setPointerCapture(e.pointerId);
-            canvas.style.cursor = 'grabbing';
-        });
-
-        canvas.addEventListener('pointermove', (e) => {
-            if (isNavigating) {
-                transform.x += (e.clientX - lastPointer.x);
-                transform.y += (e.clientY - lastPointer.y);
-                lastPointer = { x: e.clientX, y: e.clientY };
+            if (e.ctrlKey) {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? 0.95 : 1.05;
+                uiZoom(delta);
+            } else {
+                posX -= e.deltaX;
+                posY -= e.deltaY;
                 updateTransform();
             }
-        });
+        }, { passive: false });
 
-        canvas.addEventListener('pointerup', (e) => {
-            isNavigating = false;
-            canvas.releasePointerCapture(e.pointerId);
-            canvas.style.cursor = 'crosshair';
-        });
+        function toSentenceCase(str) {
+            if (!str) return str;
+            return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+        }
 
-        window.addEventListener('keydown', (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
-            if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); }
-        });
+        function render() {
+            const w = parseFloat(inputs.width.value) || 100;
+            const h = parseFloat(inputs.height.value) || 100;
+            const factor = currentUnit === 'mm' ? MM_TO_PX : 1;
+            const wPx = w * factor;
+            const hPx = h * factor;
+            
+            canvas.width = wPx; 
+            canvas.height = hPx;
+            ctx.clearRect(0, 0, wPx, hPx);
+            ctx.fillStyle = "#ffffff"; 
+            ctx.fillRect(0, 0, wPx, hPx);
 
-        ui.undo.addEventListener('click', undo);
-        ui.redo.addEventListener('click', redo);
+            if (bgImageObj) {
+                ctx.save();
+                const imgRatio = bgImageObj.width / bgImageObj.height;
+                const canvasRatio = wPx / hPx;
+                let drawW, drawH, drawX, drawY;
 
-        function calculate(w, h, type) {
-            state = { guidesV: [], guidesH: [], shapes: [] };
-            const diag = Math.sqrt(w*w + h*h);
-            const m = Math.min(w, h);
+                if (imgRatio > canvasRatio) {
+                    drawH = hPx;
+                    drawW = hPx * imgRatio;
+                    drawX = (wPx - drawW) / 2;
+                    drawY = 0;
+                } else {
+                    drawW = wPx;
+                    drawH = wPx / imgRatio;
+                    drawX = 0;
+                    drawY = (hPx - drawH) / 2;
+                }
 
-            switch(type) {
-                case 'modular':
-                    const cols = Math.max(1, parseInt(ui.cols.value) || 1);
-                    const rows = Math.max(1, parseInt(ui.rows.value) || 1);
-                    const g = parseFloat(ui.gutter.value) || 0;
-                    const cw = (w - (g * (cols - 1))) / cols;
-                    const rh = (h - (g * (rows - 1))) / rows;
-                    for(let i=0; i<cols; i++) { 
-                        let x = i*(cw+g); 
-                        if (i>0) state.guidesV.push(x - g); 
-                        state.guidesV.push(x);
-                    }
-                    state.guidesV.push(w);
-                    for(let i=0; i<rows; i++) { 
-                        let y = i*(rh+g); 
-                        if (i>0) state.guidesH.push(y - g); 
-                        state.guidesH.push(y);
-                    }
-                    state.guidesH.push(h);
-                    break;
-                case 'golden': 
-                    state.guidesV = [w/PHI, w - w/PHI]; 
-                    state.guidesH = [h/PHI, h - h/PHI]; 
-                    break;
-                case 'thirds': 
-                    state.guidesV = [w/3, (w*2)/3]; 
-                    state.guidesH = [h/3, (h*2)/3]; 
-                    break;
-                case 'villard': 
-                    state.guidesV = [w/9, w/3, w*2/3, w*8/9]; 
-                    state.guidesH = [h/9, h/3, h*2/3, h*8/9]; 
-                    state.shapes.push({type:'line', x1:0, y1:0, x2:w, y2:h}, {type:'line', x1:w, y1:0, x2:0, y2:h});
-                    break;
-                case 'van_de_graaf':
-                    state.shapes.push({type:'line', x1:0, y1:0, x2:w, y2:h}, {type:'line', x1:w, y1:0, x2:0, y2:h}, {type:'line', x1:w/2, y1:0, x2:w/2, y2:h});
-                    state.guidesV = [w/9, w/6, w*2/3, w*5/6];
-                    state.guidesH = [h/9, h/6, h*2/3, h*5/6];
-                    break;
-                case 'root2': 
-                    state.guidesV = [w/1.414, w - w/1.414]; 
-                    state.guidesH = [h/1.414, h - h/1.414]; 
-                    break;
-                case 'fibonacci':
-                    let f=[1,1,2,3,5,8,13,21]; let s=f.reduce((a,b)=>a+b,0); let cv=0, ch=0;
-                    f.forEach(v=>{ cv+=(v/s)*w; ch+=(v/s)*h; state.guidesV.push(cv); state.guidesH.push(ch); });
-                    break;
-                case 'circle_center':
-                    for(let i=1; i<=10; i++) state.shapes.push({type:'circle', x:w/2, y:h/2, r:(m/20)*i*2});
-                    break;
-                case 'vesica':
-                    const r = m/4;
-                    state.shapes.push({type:'circle', x:w/2-r/2, y:h/2, r}, {type:'circle', x:w/2+r/2, y:h/2, r});
-                    break;
-                case 'triangle_mesh':
-                    for(let i=0; i<=4; i++){
-                        state.shapes.push({type:'line', x1:w*i/4, y1:0, x2:w/2, y2:h}, {type:'line', x1:w*i/4, y1:h, x2:w/2, y2:0});
-                    }
-                    break;
-                case 'diamond':
-                    state.shapes.push({type:'line', x1:w/2, y1:0, x2:0, y2:h/2}, {type:'line', x1:0, y1:h/2, x2:w/2, y2:h}, {type:'line', x1:w/2, y1:h, x2:w, y2:h/2}, {type:'line', x1:w, y1:h/2, x2:w/2, y2:0});
-                    break;
-                case 'hexagonal':
-                    const hexR = m/10;
-                    for(let i=-1; i<12; i++) for(let j=-1; j<12; j++) {
-                        let cx = i*hexR*1.5; let cy = j*hexR*1.732 + (i%2?hexR*0.866:0);
-                        for(let k=0; k<6; k++){
-                            let a1 = (k/6)*Math.PI*2 - Math.PI/2;
-                            let a2 = ((k+1)/6)*Math.PI*2 - Math.PI/2;
-                            state.shapes.push({
-                                type:'line', 
-                                x1: cx + Math.cos(a1)*hexR, y1: cy + Math.sin(a1)*hexR,
-                                x2: cx + Math.cos(a2)*hexR, y2: cy + Math.sin(a2)*hexR
-                            });
-                        }
-                    }
-                    break;
-                case 'pentagon':
-                    let pr = m/3;
-                    for(let k=0; k<5; k++){
-                         let a1 = (k/5)*Math.PI*2 - Math.PI/2;
-                         let a2 = ((k+1)/5)*Math.PI*2 - Math.PI/2;
-                         state.shapes.push({
-                            type:'line', 
-                            x1: w/2 + Math.cos(a1)*pr, y1: h/2 + Math.sin(a1)*pr,
-                            x2: w/2 + Math.cos(a2)*pr, y2: h/2 + Math.sin(a2)*pr
-                        });
-                    }
-                    break;
-                case 'diagonal_method':
-                    state.shapes.push({type:'line', x1:0, y1:0, x2:w, y2:h}, {type:'line', x1:w, y1:0, x2:0, y2:h});
-                    state.guidesV = [m, w-m];
-                    break;
-                case 'rabatment':
-                    state.guidesV = [m, w-m];
-                    state.guidesH = [m, h-m];
-                    break;
-                case 'spiral':
-                    let sw=w, sh=h, sx=0, sy=0;
-                    for(let i=0; i<10; i++){
-                        state.shapes.push(
-                            {type:'line', x1:sx, y1:sy, x2:sx+sw, y2:sy},
-                            {type:'line', x1:sx+sw, y1:sy, x2:sx+sw, y2:sy+sh},
-                            {type:'line', x1:sx+sw, y1:sy+sh, x2:sx, y2:sy+sh},
-                            {type:'line', x1:sx, y1:sy+sh, x2:sx, y2:sy}
-                        );
-                        if(i%4===0) { sx += sw/PHI; sw -= sw/PHI; }
-                        else if(i%4===1) { sy += sh/PHI; sh -= sh/PHI; }
-                        else if(i%4===2) { sw -= sw/PHI; }
-                        else { sh -= sh/PHI; }
-                    }
-                    break;
-                case 'optical_center':
-                    state.guidesV=[w/2]; state.guidesH=[h/2, h*0.382];
-                    state.shapes.push({type:'circle', x:w/2, y:h*0.382, r:2});
-                    break;
-                case 'radial_rays':
-                    for(let i=0; i<12; i++){
-                        let a = (i/12)*Math.PI*2;
-                        state.shapes.push({type:'line', x1:w/2, y1:h/2, x2:w/2+Math.cos(a)*diag, y2:h/2+Math.sin(a)*diag});
-                    }
-                    break;
+                ctx.drawImage(bgImageObj, drawX, drawY, drawW, drawH);
+                const opacity = inputs.bgOpacity.value / 100;
+                opacityValDisplay.textContent = inputs.bgOpacity.value + "%";
+                ctx.globalAlpha = opacity;
+                ctx.fillStyle = "#000000";
+                ctx.fillRect(0, 0, wPx, hPx);
+                ctx.restore();
+            } else {
+                opacityValDisplay.textContent = "0%";
+            }
+
+            const sys = inputs.system.value;
+            const selectedGridText = inputs.system.options[inputs.system.selectedIndex].text;
+            let infoString = toSentenceCase(selectedGridText);
+            const cols = Math.max(1, parseInt(inputs.cols.value));
+            const rows = Math.max(1, parseInt(inputs.rows.value));
+            const gutterVal = parseFloat(inputs.gutter.value) || 0;
+            const isoDens = parseInt(inputs.isoScale.value);
+
+            if (sys === 'modular') {
+                infoString += ` • ${cols} col. • ${rows} rangs • ${gutterVal}${currentUnit} gout.`;
+            } else if (sys === 'columns') {
+                infoString += ` • ${cols} col. • ${gutterVal}${currentUnit} gout.`;
+            } else if (sys === 'isometric') {
+                infoString += ` • Densité ${isoDens}%`;
+                isoValDisplay.textContent = isoDens + "%";
+            } else if (sys === 'dots') {
+                infoString += ` • ${cols} × ${rows} points`;
+            }
+            badgeGridInfo.textContent = infoString;
+
+            const gutter = gutterVal * factor;
+
+            document.getElementById('isoScaleContainer').style.display = (sys === 'isometric') ? 'block' : 'none';
+            document.getElementById('divisionControls').style.display = (['modular', 'columns', 'dots'].includes(sys)) ? 'grid' : 'none';
+            document.getElementById('gutterContainer').style.display = (['modular', 'columns'].includes(sys)) ? 'block' : 'none';
+            document.getElementById('bleedContainer').style.display = (currentPresetType === 'print') ? 'block' : 'none';
+
+            const warningEl = document.getElementById('gridWarning');
+            warningEl.style.display = (sys === 'dots' || sys === 'isometric') ? 'flex' : 'none';
+
+            ctx.save();
+            ctx.globalAlpha = 0.1;
+            ctx.fillStyle = "#ff00ff";
+            if (specialFormat === 'FB_Cover') {
+                ctx.fillRect(0, 0, 90 * factor, hPx);
+                ctx.fillRect(wPx - (90 * factor), 0, 90 * factor, hPx);
+            } else if (specialFormat === 'X_Cover') {
+                ctx.fillRect(0, 0, wPx, 50 * factor);
+                ctx.fillRect(0, hPx - (50 * factor), wPx, 50 * factor);
+            }
+            ctx.restore();
+
+            ctx.strokeStyle = "#00ffba"; 
+            ctx.lineWidth = 1;
+
+            if (sys === 'modular' || sys === 'columns') {
+                const cw = (wPx - (cols - 1) * gutter) / cols;
+                const rh = (hPx - (rows - 1) * gutter) / rows;
+                for (let i = 0; i < cols; i++) ctx.strokeRect(i * (cw + gutter), 0, cw, hPx);
+                if (sys === 'modular') for (let j = 0; j < rows; j++) ctx.strokeRect(0, j * (rh + gutter), wPx, rh);
+            } else if (sys === 'isometric') {
+                renderIsometric(wPx, hPx, (parseFloat(inputs.isoScale.value) || 50) * (factor / 4));
+            } else if (sys === 'golden_section') {
+                const phi = 1.61803398875;
+                const x = wPx / phi; const y = hPx / phi;
+                ctx.strokeRect(0, 0, x, hPx); ctx.strokeRect(wPx-x, 0, x, hPx);
+                ctx.strokeRect(0, 0, wPx, y); ctx.strokeRect(0, hPx-y, wPx, y);
+            } else if (sys === 'vandegraaf') {
+                ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(wPx, hPx); ctx.moveTo(wPx, 0); ctx.lineTo(0, hPx);
+                ctx.moveTo(wPx/2, 0); ctx.lineTo(0, hPx); ctx.moveTo(wPx/2, 0); ctx.lineTo(wPx, hPx);
+                ctx.stroke(); ctx.strokeRect(wPx/9, hPx/9, wPx*7/9, hPx*7/9);
+            } else if (sys === 'diagonal') {
+                ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(wPx, hPx); ctx.moveTo(wPx, 0); ctx.lineTo(0, hPx);
+                ctx.moveTo(wPx/2, 0); ctx.lineTo(wPx/2, hPx); ctx.moveTo(0, hPx/2); ctx.lineTo(wPx, hPx/2); ctx.stroke();
+            } else if (sys === 'dots') {
+                const cx = parseInt(inputs.cols.value); const ry = parseInt(inputs.rows.value);
+                ctx.fillStyle = "#00ffba";
+                for (let i = 0; i <= cx; i++) for (let j = 0; j <= ry; j++) {
+                    ctx.beginPath(); ctx.arc(i * (wPx/cx), j * (hPx/ry), 2, 0, Math.PI*2); ctx.fill();
+                }
+            } else if (sys === 'rule_of_thirds') {
+                for(let i=1; i<3; i++) {
+                    ctx.beginPath(); ctx.moveTo(i*wPx/3, 0); ctx.lineTo(i*wPx/3, hPx); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(0, i*hPx/3); ctx.lineTo(wPx, i*hPx/3); ctx.stroke();
+                }
             }
         }
 
-        function render(w, h) {
-            container.style.width = w + 'mm';
-            container.style.height = h + 'mm';
-            const scale = 4;
-            canvas.width = w * scale; canvas.height = h * scale;
-            ctx.clearRect(0,0, canvas.width, canvas.height);
-            ctx.scale(scale, scale);
-
-            ctx.lineWidth = 0.4;
-            ctx.strokeStyle = '#00ffba'; 
-            state.shapes.forEach(s => {
-                ctx.beginPath();
-                if(s.type==='line') { ctx.moveTo(s.x1, s.y1); ctx.lineTo(s.x2, s.y2); }
-                else if(s.type==='circle') { ctx.arc(s.x, s.y, s.r, 0, Math.PI*2); }
-                ctx.stroke();
-            });
-
-            state.guidesV.forEach((x) => {
-                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
-            });
-            state.guidesH.forEach((y) => {
-                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-            });
+        function renderIsometric(w, h, step) {
+            ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.clip();
+            const hStep = step * Math.sqrt(3);
+            for (let i = -w * 2; i < w * 3; i += hStep) { 
+                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, h); ctx.stroke(); 
+            }
+            for (let i = -h * 3; i < h * 3; i += step * 2) {
+                ctx.beginPath(); ctx.moveTo(-w, i); ctx.lineTo(w * 2, i + (w * 3) / Math.sqrt(3)); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(-w, i); ctx.lineTo(w * 2, i - (w * 3) / Math.sqrt(3)); ctx.stroke();
+            }
+            ctx.restore();
         }
+
+        function updateDocument() {
+            const w = inputs.width.value;
+            const h = inputs.height.value;
+            const factor = currentUnit === 'mm' ? MM_TO_PX : 1;
+            container.style.width = (w * factor) + 'px';
+            container.style.height = (h * factor) + 'px';
+            
+            const selectedOption = inputs.presets.options[inputs.presets.selectedIndex];
+            badgeFormatName.textContent = inputs.presets.value === 'custom' ? 'CUSTOM' : (selectedOption.text.split(' (')[0]);
+            badgeDimText.textContent = `${w} × ${h} ${currentUnit}`;
+
+            document.querySelectorAll('.doc-unit').forEach(el => el.textContent = currentUnit);
+            
+            autoFitZoom();
+            render();
+            saveState();
+        }
+
+        inputs.presets.addEventListener('change', () => {
+            if (inputs.presets.value === 'custom') {
+                updateDocument();
+                return;
+            }
+            const p = inputs.presets.value.split(',');
+            currentPresetType = p[0]; 
+            inputs.width.value = p[1]; 
+            inputs.height.value = p[2];
+            inputs.bleed.value = p[3] || 0;
+            specialFormat = p[4] || null;
+            currentUnit = (currentPresetType === 'print') ? 'mm' : 'px';
+            updateDocument();
+        });
+
+        [inputs.width, inputs.height].forEach(el => el.addEventListener('change', updateDocument));
+
+        inputs.bgImage.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => { 
+                    bgImageObj = img; 
+                    updateImageBtnUI(true);
+                    render(); 
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        inputs.bgOpacity.addEventListener('input', render);
+
+        Object.values(inputs).forEach(input => {
+            if(!['widthInput', 'heightInput', 'formatPresets', 'bgImageInput', 'bgOpacityInput'].includes(input.id)) {
+                input.addEventListener('change', updateDocument);
+            }
+        });
 
         function exportPNG() {
             const link = document.createElement('a');
-            link.download = `Grid_${ui.system.value}.png`;
-            link.href = canvas.toDataURL('image/png');
+            link.download = `Grid_${inputs.system.value}.png`;
+            link.href = canvas.toDataURL("image/png");
             link.click();
         }
 
-        function exportJSX(app) {
-            const w = parseFloat(ui.width.value);
-            const h = parseFloat(ui.height.value);
-            const gridName = ui.system.value;
-            const appLabel = app.toUpperCase();
-            const formatLabel = `${w}x${h}`;
+        function runExport(app) {
+            const w = parseFloat(inputs.width.value);
+            const h = parseFloat(inputs.height.value);
+            const b = parseFloat(inputs.bleed.value);
+            const sys = inputs.system.value;
+            const isMM = currentUnit === 'mm';
+            
+            let jsx = `// GridGen Pro Export - ${app}\n`;
+            
+            if (app === 'InDesign') {
+                jsx += `app.scriptPreferences.measurementUnit = MeasurementUnits.${isMM ? 'MILLIMETERS' : 'PIXELS'};\n`;
+                jsx += `var doc = app.documents.add({\n`;
+                jsx += `  documentPreferences: {\n`;
+                jsx += `    pageWidth: ${w}, pageHeight: ${h},\n`;
+                jsx += `    documentBleedTopOffset: ${b}, documentBleedBottomOffset: ${b},\n`;
+                jsx += `    documentBleedInsideOrLeftOffset: ${b}, documentBleedOutsideOrRightOffset: ${b}\n`;
+                jsx += `  }\n});\n`;
+                jsx += `var page = doc.pages[0];\n`;
+                jsx += `var layer = doc.layers.add({name: "Guides Structurels", layerColor: [0, 255, 186]});\n\n`;
+                jsx += `function addGuide(pos, orient) {\n`;
+                jsx += `  if (pos < 0 || (orient == HorizontalOrVertical.VERTICAL && pos > ${w}) || (orient == HorizontalOrVertical.HORIZONTAL && pos > ${h})) return;\n`;
+                jsx += `  page.guides.add(layer, {location: pos, orientation: orient});\n}\n`;
+                jsx += `function addTracedGuide(pts) {\n`;
+                jsx += `  var line = page.graphicLines.add(layer);\n`;
+                jsx += `  line.paths[0].entirePath = pts;\n`;
+                jsx += `  try { line.makeGuide(); } catch(e) { line.itemLayer = layer; }\n}\n\n`;
 
-            let script = "#target " + (app === 'ps' ? 'photoshop' : app === 'ai' ? 'illustrator' : 'indesign') + "\n";
-            const mmToPt = 2.83465;
-
-            if (app === 'id') {
-                script += `var doc = app.documents.add();\n`;
-                script += `doc.documentPreferences.pageWidth = "${w}mm";\n`;
-                script += `doc.documentPreferences.pageHeight = "${h}mm";\n`;
-                
-                state.guidesV.forEach(x => script += `doc.pages[0].guides.add({location: "${x}mm", orientation: HorizontalOrVertical.VERTICAL});\n`);
-                state.guidesH.forEach(y => script += `doc.pages[0].guides.add({location: "${y}mm", orientation: HorizontalOrVertical.HORIZONTAL});\n`);
-                
-                state.shapes.forEach(s => {
-                    if(s.type === 'line') {
-                        script += `doc.pages[0].graphicLines.add({geometricBounds: ["${s.y1}mm", "${s.x1}mm", "${s.y2}mm", "${s.x2}mm"], strokeColor: "Black", strokeWeight: 0.5});\n`;
-                    } else if(s.type === 'circle') {
-                        script += `doc.pages[0].ovals.add({geometricBounds: ["${s.y - s.r}mm", "${s.x - s.r}mm", "${s.y + s.r}mm", "${s.x + s.r}mm"], strokeColor: "Black", strokeWeight: 0.5, fillColor: "None"});\n`;
+                if (sys === 'modular' || sys === 'columns') {
+                    const cols = parseInt(inputs.cols.value); const rows = sys === 'modular' ? parseInt(inputs.rows.value) : 1;
+                    const g = parseFloat(inputs.gutter.value);
+                    const cw = (w - (cols - 1) * g) / cols; const rh = (h - (rows - 1) * g) / rows;
+                    for (let i = 0; i <= cols; i++) {
+                        let p = i * (cw + g); jsx += `addGuide(${p.toFixed(4)}, HorizontalOrVertical.VERTICAL);\n`;
+                        if (i < cols && g > 0) jsx += `addGuide(${(p + cw).toFixed(4)}, HorizontalOrVertical.VERTICAL);\n`;
                     }
-                });
-
-            } else if (app === 'ai') {
-                script += `var doc = app.documents.add(DocumentColorSpace.RGB, ${w*mmToPt}, ${h*mmToPt});\n`;
-                script += `var layer = doc.layers.add(); layer.name = "GridGen Guides";\n`;
-                
-                state.guidesV.forEach(x => {
-                    script += `var g = layer.pathItems.add(); g.setEntirePath([[${x*mmToPt}, 0], [${x*mmToPt}, ${h*mmToPt}]]); g.guides = true;\n`;
-                });
-                state.guidesH.forEach(y => {
-                    script += `var g = layer.pathItems.add(); g.setEntirePath([[0, ${(h-y)*mmToPt}], [${w*mmToPt}, ${(h-y)*mmToPt}]]); g.guides = true;\n`;
-                });
-                
-                state.shapes.forEach(s => {
-                    if(s.type === 'line') {
-                        script += `var p = layer.pathItems.add(); p.setEntirePath([[${s.x1*mmToPt}, ${(h-s.y1)*mmToPt}], [${s.x2*mmToPt}, ${(h-s.y2)*mmToPt}]]); p.guides = true;\n`;
-                    } else if(s.type === 'circle') {
-                        script += `var c = layer.pathItems.ellipse(${(h-(s.y-s.r))*mmToPt}, ${(s.x-s.r)*mmToPt}, ${(s.r*2)*mmToPt}, ${(s.r*2)*mmToPt}); c.guides = true;\n`;
+                    if (sys === 'modular') for (let j = 0; j <= rows; j++) {
+                        let p = j * (rh + g); jsx += `addGuide(${p.toFixed(4)}, HorizontalOrVertical.HORIZONTAL);\n`;
+                        if (j < rows && g > 0) jsx += `addGuide(${(p + rh).toFixed(4)}, HorizontalOrVertical.HORIZONTAL);\n`;
                     }
-                });
-
-            } else if (app === 'ps') {
-                script += `app.preferences.rulerUnits = Units.POINTS;\n`;
-                script += `var doc = app.documents.add(${w*mmToPt}, ${h*mmToPt}, 72, "GridGen Export", NewDocumentMode.RGB);\n`;
-                
-                state.guidesV.forEach(x => script += `doc.guides.add(Direction.VERTICAL, new UnitValue(${x}, "mm"));\n`);
-                state.guidesH.forEach(y => script += `doc.guides.add(Direction.HORIZONTAL, new UnitValue(${y}, "mm"));\n`);
-                
-                // Correction finale erreur 1220 : Utilisation stricte de Number() et suppression de ShapeOperation
-                script += `
-                function addGridPath(doc, pts) {
-                    try {
-                        var linePoints = [];
-                        for(var i=0; i<pts.length; i++) {
-                            var p = new PathPointInfo();
-                            p.kind = PointKind.CORNERPOINT;
-                            var anchorPos = [Number(pts[i][0]), Number(pts[i][1])];
-                            p.anchor = anchorPos;
-                            p.leftDirection = anchorPos;
-                            p.rightDirection = anchorPos;
-                            linePoints.push(p);
-                        }
-                        var subPath = new SubPathInfo();
-                        subPath.closed = false;
-                        subPath.entireSubPath = linePoints;
-                        doc.pathItems.add("Grid Shape", [subPath]);
-                    } catch(e) {}
-                }\n`;
-                
-                state.shapes.forEach(s => {
-                    if(s.type === 'line') {
-                        script += `addGridPath(doc, [[${s.x1*mmToPt}, ${s.y1*mmToPt}], [${s.x2*mmToPt}, ${s.y2*mmToPt}]]);\n`;
-                    } else if(s.type === 'circle') {
-                        // Pour Photoshop, on approxime le cercle par un tracé de guides manuel si nécessaire,
-                        // ou on ignore les tracés complexes si l'erreur 1220 persiste sur les courbes.
-                        // Ici on tente une ligne simplifiée.
+                } else if (sys === 'diagonal') {
+                    jsx += `addTracedGuide([[0,0],[${h},${w}]]);\naddTracedGuide([[0,${w}],[${h},0]]);\n`;
+                    jsx += `addGuide(${w/2}, HorizontalOrVertical.VERTICAL);\naddGuide(${h/2}, HorizontalOrVertical.HORIZONTAL);\n`;
+                } else if (sys === 'vandegraaf') {
+                    jsx += `addTracedGuide([[0,0],[${h},${w}]]);\naddTracedGuide([[0,${w}],[${h},0]]);\n`;
+                    jsx += `addTracedGuide([[0,${w/2}],[${h},0]]);\naddTracedGuide([[0,${w/2}],[${h},${w}]]);\n`;
+                    jsx += `var mX = ${w/9}; var mY = ${h/9};\n`;
+                    jsx += `addTracedGuide([[mY,mX],[mY,${w}-mX],[${h}-mY,${w}-mX],[${h}-mY,mX],[mY,mX]]);\n`;
+                } else if (sys === 'dots') {
+                    const cx = parseInt(inputs.cols.value); const ry = parseInt(inputs.rows.value);
+                    for (let i = 0; i <= cx; i++) for (let j = 0; j <= ry; j++) {
+                        let px = i * (w/cx); let py = j * (h/ry);
+                        jsx += `page.ovals.add(layer, {geometricBounds: [${py-0.2}, ${px-0.2}, ${py+0.2}, ${px+0.2}], fillColor: "Black", strokeWeight: 0});\n`;
                     }
-                });
+                }
+            } else if (app === 'Illustrator') {
+                jsx += `var doc = app.documents.add(DocumentColorSpace.RGB, ${isMM ? w*2.8346 : w}, ${isMM ? h*2.8346 : h});\n`;
+            } else if (app === 'Photoshop') {
+                jsx += `preferences.rulerUnits = Units.${isMM ? 'MM' : 'PIXELS'};\n`;
+                jsx += `var doc = app.documents.add(${w}, ${h}, 72, "GridGen");\n`;
             }
 
-            const blob = new Blob([script], {type: 'text/plain'});
+            jsx += `alert("Exportation terminée !");\n`;
+            const blob = new Blob([jsx], {type: "text/plain"});
             const link = document.createElement('a');
-            link.download = `GridGen_${gridName}_${appLabel}_${formatLabel}.jsx`;
+            link.download = `GridGen_${app}_${sys}.jsx`;
             link.href = URL.createObjectURL(blob);
             link.click();
+            const diag = document.getElementById('successDialog');
+            diag.classList.add('active');
+            setTimeout(() => diag.classList.remove('active'), 2500);
         }
 
-        function update() {
-            const w = parseFloat(ui.width.value) || 210;
-            const h = parseFloat(ui.height.value) || 297;
-            document.getElementById('modularParams').style.display = ui.system.value === 'modular' ? 'block' : 'none';
-            ui.dimInfo.innerText = `${w} x ${h} mm`;
-            calculate(w, h, ui.system.value);
-            saveHistory();
-            render(w, h);
-        }
-
-        ui.presets.addEventListener('change', () => {
-            if(ui.presets.value !== 'custom') {
-                const [w, h] = ui.presets.value.split(',');
-                ui.width.value = w; ui.height.value = h;
+        // Shortcuts
+        window.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 'z') { e.preventDefault(); undo(); }
+                if (e.key === 'y') { e.preventDefault(); redo(); }
             }
-            update();
         });
 
-        [ui.width, ui.height, ui.system, ui.cols, ui.rows, ui.gutter].forEach(el => el.addEventListener('input', update));
-        update();
-        resetView();
+        window.onload = () => {
+            updateDocument();
+            // Initial save state
+            saveState(); 
+        };
+        window.onresize = updateTransform;
     </script>
 </body>
 </html>
