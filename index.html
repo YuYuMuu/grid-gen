@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Adobe Grid Generator Pro v6.2</title>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         :root {
             --bg-deep: #0f1218;
@@ -86,7 +87,7 @@
         .control-btn:hover { background: var(--bg-card); border-color: var(--ps-guide); color: var(--ps-guide); }
         .control-btn:disabled { opacity: 0.3; cursor: not-allowed; border-color: var(--border-color); color: var(--text-dim); }
 
-        /* Zoom Indicator Bottom Left */
+        /* Zoom Indicator */
         .zoom-indicator {
             position: absolute;
             bottom: 30px;
@@ -103,7 +104,7 @@
             backdrop-filter: blur(4px);
         }
 
-        /* Badge Info Style Figma */
+        /* Badge Style */
         .figma-badge { 
             position: absolute; 
             left: 0; 
@@ -124,18 +125,51 @@
         .export-btn { background: #2d333b; color: white; border: 1px solid var(--border-color); padding: 10px; border-radius: 6px; font-size: 0.7rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s; }
         .export-btn:hover { background: var(--ps-guide); color: #000; }
         
-        .success-dialog { position: fixed; bottom: -150px; left: 50%; transform: translateX(-50%); background-color: var(--ps-guide); color: #000; padding: 1rem 2rem; border-radius: 12px; z-index: 1001; font-weight: 700; transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); opacity: 0; }
-        .success-dialog.active { bottom: 40px; opacity: 1; }
+        /* Modal Export / Overlay */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(5px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-content {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+        .modal-content h2 { color: var(--ps-guide); margin-top: 0; }
+        .modal-content p { font-size: 0.9rem; line-height: 1.5; color: var(--text-main); margin: 1.5rem 0; text-align: left; }
+        .modal-content ul { text-align: left; font-size: 0.85rem; padding-left: 1.2rem; color: var(--text-dim); }
+        .modal-content li { margin-bottom: 8px; }
+        .close-modal-btn {
+            background: var(--ps-guide);
+            color: #000;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 6px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+
         #bleedContainer { display: none; }
 
-        /* Image section styling */
         .file-upload-btn { background: var(--bg-deep); border: 1px dashed var(--border-color); color: var(--text-dim); padding: 0.8rem; width: 100%; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.75rem; transition: all 0.2s; }
         .file-upload-btn:hover { border-color: var(--ps-guide); color: var(--ps-guide); }
-        .file-upload-btn.has-file { border-color: #ff4a4a; color: #ff4a4a; border-style: solid; }
-        .file-upload-btn.has-file:hover { background: rgba(255, 74, 74, 0.1); }
+        .file-upload-btn.has-file { border-color: var(--warning); color: var(--warning); border-style: solid; background: rgba(255, 171, 112, 0.05); }
+        
         #bgImageInput { display: none; }
         .helper-text { font-size: 0.6rem; color: var(--text-dim); margin-top: 6px; font-style: italic; }
-        
         .warning-text { font-size: 0.65rem; color: var(--warning); margin-top: 10px; display: none; align-items: flex-start; gap: 6px; line-height: 1.3; }
     </style>
 </head>
@@ -164,7 +198,7 @@
                             <option value="web,1920,1080,0,FullHD">Full HD (16:9 - 1920x1080)</option>
                             <option value="web,1080,1080,0,InstaSquare">Insta Carré (1:1 - 1080x1080)</option>
                             <option value="web,1080,1350,0,InstaPortrait">Insta Portrait (4:5 - 1080x1350)</option>
-                            <option value="web,1080,1920,0,TikTok">Story / TikTok (9:16 - 1080x1920)</option>
+                            <option value="web,1080,1920,0,Story">Story / TikTok (9:16 - 1080x1920)</option>
                             <option value="web,851,315,0,FB_Cover">Facebook Cover (2.7:1 - 851x315)</option>
                             <option value="web,1500,500,0,X_Cover">X / Twitter Cover (3:1 - 1500x500)</option>
                         </optgroup>
@@ -297,7 +331,22 @@
         </main>
     </div>
 
-    <div id="successDialog" class="success-dialog">Exportation terminée avec succès !</div>
+    <!-- Modal Instructions & Overlay -->
+    <div id="exportModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 id="modalTitle">Export Réussi !</h2>
+            <div id="modalBody">
+                <p>Votre script d'automatisation a été généré. Pour l'appliquer :</p>
+                <ul id="modalInstructions">
+                    <li>Ouvrez votre logiciel Adobe (Photoshop, Illustrator ou InDesign).</li>
+                    <li>Allez dans le menu <b>Fichier > Scripts > Parcourir...</b></li>
+                    <li>Sélectionnez le fichier <b>.jsx</b> que vous venez de télécharger.</li>
+                    <li>Le document se créera automatiquement avec le format et les repères configurés.</li>
+                </ul>
+            </div>
+            <button class="close-modal-btn" onclick="closeModal()">Compris !</button>
+        </div>
+    </div>
 
     <script>
         lucide.createIcons();
@@ -339,7 +388,7 @@
         let specialFormat = null;
         let bgImageObj = null;
 
-        // History Management
+        // History
         let history = [];
         let historyIndex = -1;
         let isRecording = true;
@@ -357,12 +406,7 @@
                 preset: inputs.presets.value,
                 unit: currentUnit
             };
-            
-            // Si on change quelque chose alors qu'on était revenu en arrière, on tronque le futur
-            if (historyIndex < history.length - 1) {
-                history = history.slice(0, historyIndex + 1);
-            }
-            
+            if (historyIndex < history.length - 1) history = history.slice(0, historyIndex + 1);
             history.push(JSON.stringify(state));
             if (history.length > 50) history.shift();
             historyIndex = history.length - 1;
@@ -399,23 +443,18 @@
             inputs.isoScale.value = state.isoScale;
             inputs.presets.value = state.preset;
             currentUnit = state.unit;
-            
             updateDocument();
             updateHistoryButtons();
             isRecording = true;
         }
 
-        // Image Management
         function handleImageAction() {
-            const btn = document.getElementById('bgImageBtn');
             if (bgImageObj) {
-                // Suppression
                 bgImageObj = null;
                 inputs.bgImage.value = '';
                 updateImageBtnUI(false);
                 render();
             } else {
-                // Chargement
                 inputs.bgImage.click();
             }
         }
@@ -424,7 +463,6 @@
             const btn = document.getElementById('bgImageBtn');
             const icon = document.getElementById('imageBtnIcon');
             const text = document.getElementById('imageBtnText');
-            
             if (hasImage) {
                 btn.classList.add('has-file');
                 text.textContent = "Supprimer l'image";
@@ -441,8 +479,7 @@
             wrapper.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
             if (badge) {
                 badge.style.transform = `scale(${1/scale})`;
-                const badgeHeightEstimate = 38; 
-                badge.style.top = `${-(badgeHeightEstimate + 5) / scale}px`;
+                badge.style.top = `${-43 / scale}px`;
             }
             zoomText.textContent = `ZOOM: ${Math.round(scale * 100)}%`;
         }
@@ -453,9 +490,7 @@
             updateTransform();
         }
 
-        function resetView() {
-            autoFitZoom();
-        }
+        function resetView() { autoFitZoom(); }
 
         function autoFitZoom() {
             const w = parseFloat(inputs.width.value) || 100;
@@ -463,30 +498,17 @@
             const factor = currentUnit === 'mm' ? MM_TO_PX : 1;
             const wPx = w * factor;
             const hPx = h * factor;
-
-            let targetScale = 0.5;
             const vpW = viewPort.clientWidth - 150;
             const vpH = viewPort.clientHeight - 150;
-            const fitScale = Math.min(vpW / wPx, vpH / hPx);
-
-            if (targetScale > fitScale) {
-                scale = fitScale;
-            } else {
-                scale = targetScale;
-            }
-
-            posX = 0;
-            posY = 0;
+            scale = Math.min(vpW / wPx, vpH / hPx, 0.5);
+            posX = 0; posY = 0;
             updateTransform();
         }
 
         viewPort.addEventListener('mousedown', (e) => {
-            if (e.button === 0 || e.button === 2) { 
-                isDragging = true;
-                startX = e.clientX - posX;
-                startY = e.clientY - posY;
-                e.preventDefault();
-            }
+            isDragging = true;
+            startX = e.clientX - posX;
+            startY = e.clientY - posY;
         });
 
         window.addEventListener('mousemove', (e) => {
@@ -497,65 +519,48 @@
         });
 
         window.addEventListener('mouseup', () => isDragging = false);
-        viewPort.addEventListener('contextmenu', (e) => e.preventDefault());
 
         viewPort.addEventListener('wheel', (e) => {
             if (e.ctrlKey) {
                 e.preventDefault();
-                const delta = e.deltaY > 0 ? 0.95 : 1.05;
-                uiZoom(delta);
+                uiZoom(e.deltaY > 0 ? 0.95 : 1.05);
             } else {
-                posX -= e.deltaX;
-                posY -= e.deltaY;
+                posX -= e.deltaX; posY -= e.deltaY;
                 updateTransform();
             }
         }, { passive: false });
 
-        function toSentenceCase(str) {
-            if (!str) return str;
-            return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
-        }
+        function toSentenceCase(str) { return str ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase() : ""; }
 
-        function render() {
+        function render(targetCtx = ctx, isExport = false) {
             const w = parseFloat(inputs.width.value) || 100;
             const h = parseFloat(inputs.height.value) || 100;
             const factor = currentUnit === 'mm' ? MM_TO_PX : 1;
             const wPx = w * factor;
             const hPx = h * factor;
             
-            canvas.width = wPx; 
-            canvas.height = hPx;
-            ctx.clearRect(0, 0, wPx, hPx);
-            ctx.fillStyle = "#ffffff"; 
-            ctx.fillRect(0, 0, wPx, hPx);
-
-            if (bgImageObj) {
-                ctx.save();
-                const imgRatio = bgImageObj.width / bgImageObj.height;
-                const canvasRatio = wPx / hPx;
-                let drawW, drawH, drawX, drawY;
-
-                if (imgRatio > canvasRatio) {
-                    drawH = hPx;
-                    drawW = hPx * imgRatio;
-                    drawX = (wPx - drawW) / 2;
-                    drawY = 0;
-                } else {
-                    drawW = wPx;
-                    drawH = wPx / imgRatio;
-                    drawX = 0;
-                    drawY = (hPx - drawH) / 2;
+            const targetCanvas = targetCtx.canvas;
+            targetCanvas.width = wPx; 
+            targetCanvas.height = hPx;
+            targetCtx.clearRect(0, 0, wPx, hPx);
+            
+            if (!isExport) {
+                targetCtx.fillStyle = "#ffffff"; 
+                targetCtx.fillRect(0, 0, wPx, hPx);
+                if (bgImageObj) {
+                    targetCtx.save();
+                    const imgRatio = bgImageObj.width / bgImageObj.height;
+                    const canvasRatio = wPx / hPx;
+                    let drawW, drawH, drawX, drawY;
+                    if (imgRatio > canvasRatio) { drawH = hPx; drawW = hPx * imgRatio; drawX = (wPx - drawW) / 2; drawY = 0; }
+                    else { drawW = wPx; drawH = wPx / imgRatio; drawX = 0; drawY = (hPx - drawH) / 2; }
+                    targetCtx.drawImage(bgImageObj, drawX, drawY, drawW, drawH);
+                    targetCtx.globalAlpha = inputs.bgOpacity.value / 100;
+                    targetCtx.fillStyle = "#000000";
+                    targetCtx.fillRect(0, 0, wPx, hPx);
+                    targetCtx.restore();
                 }
-
-                ctx.drawImage(bgImageObj, drawX, drawY, drawW, drawH);
-                const opacity = inputs.bgOpacity.value / 100;
                 opacityValDisplay.textContent = inputs.bgOpacity.value + "%";
-                ctx.globalAlpha = opacity;
-                ctx.fillStyle = "#000000";
-                ctx.fillRect(0, 0, wPx, hPx);
-                ctx.restore();
-            } else {
-                opacityValDisplay.textContent = "0%";
             }
 
             const sys = inputs.system.value;
@@ -565,242 +570,239 @@
             const rows = Math.max(1, parseInt(inputs.rows.value));
             const gutterVal = parseFloat(inputs.gutter.value) || 0;
             const isoDens = parseInt(inputs.isoScale.value);
-
-            if (sys === 'modular') {
-                infoString += ` • ${cols} col. • ${rows} rangs • ${gutterVal}${currentUnit} gout.`;
-            } else if (sys === 'columns') {
-                infoString += ` • ${cols} col. • ${gutterVal}${currentUnit} gout.`;
-            } else if (sys === 'isometric') {
-                infoString += ` • Densité ${isoDens}%`;
-                isoValDisplay.textContent = isoDens + "%";
-            } else if (sys === 'dots') {
-                infoString += ` • ${cols} × ${rows} points`;
-            }
-            badgeGridInfo.textContent = infoString;
-
             const gutter = gutterVal * factor;
 
-            document.getElementById('isoScaleContainer').style.display = (sys === 'isometric') ? 'block' : 'none';
-            document.getElementById('divisionControls').style.display = (['modular', 'columns', 'dots'].includes(sys)) ? 'grid' : 'none';
-            document.getElementById('gutterContainer').style.display = (['modular', 'columns'].includes(sys)) ? 'block' : 'none';
-            document.getElementById('bleedContainer').style.display = (currentPresetType === 'print') ? 'block' : 'none';
-
-            const warningEl = document.getElementById('gridWarning');
-            warningEl.style.display = (sys === 'dots' || sys === 'isometric') ? 'flex' : 'none';
-
-            ctx.save();
-            ctx.globalAlpha = 0.1;
-            ctx.fillStyle = "#ff00ff";
-            if (specialFormat === 'FB_Cover') {
-                ctx.fillRect(0, 0, 90 * factor, hPx);
-                ctx.fillRect(wPx - (90 * factor), 0, 90 * factor, hPx);
-            } else if (specialFormat === 'X_Cover') {
-                ctx.fillRect(0, 0, wPx, 50 * factor);
-                ctx.fillRect(0, hPx - (50 * factor), wPx, 50 * factor);
+            if (sys === 'modular') infoString += ` • ${cols} col. • ${rows} rangs • ${gutterVal}${currentUnit} gout.`;
+            else if (sys === 'columns') infoString += ` • ${cols} col. • ${gutterVal}${currentUnit} gout.`;
+            else if (sys === 'isometric') { infoString += ` • Densité ${isoDens}%`; isoValDisplay.textContent = isoDens + "%"; }
+            
+            if (!isExport) {
+                badgeGridInfo.textContent = infoString;
+                document.getElementById('isoScaleContainer').style.display = (sys === 'isometric') ? 'block' : 'none';
+                document.getElementById('divisionControls').style.display = (['modular', 'columns', 'dots'].includes(sys)) ? 'grid' : 'none';
+                document.getElementById('gutterContainer').style.display = (['modular', 'columns'].includes(sys)) ? 'block' : 'none';
+                document.getElementById('bleedContainer').style.display = (currentPresetType === 'print') ? 'block' : 'none';
+                document.getElementById('gridWarning').style.display = (sys === 'dots' || sys === 'isometric') ? 'flex' : 'none';
             }
-            ctx.restore();
 
-            ctx.strokeStyle = "#00ffba"; 
-            ctx.lineWidth = 1;
+            // Draw Safe Zones
+            targetCtx.save();
+            targetCtx.fillStyle = "#ff00ff";
+            targetCtx.globalAlpha = isExport ? 0.4 : 0.15;
+            
+            if (specialFormat === 'FB_Cover') {
+                targetCtx.fillRect(0, 0, 90 * factor, hPx);
+                targetCtx.fillRect(wPx - (90 * factor), 0, 90 * factor, hPx);
+            } else if (specialFormat === 'X_Cover') {
+                targetCtx.fillRect(0, 0, wPx, 50 * factor);
+                targetCtx.fillRect(0, hPx - (50 * factor), wPx, 50 * factor);
+            } else if (specialFormat === 'Story') {
+                targetCtx.fillRect(0, 0, wPx, hPx * 0.14);
+                targetCtx.fillRect(0, hPx * 0.80, wPx, hPx * 0.20);
+            }
+            targetCtx.restore();
+
+            // Draw Grid lines
+            targetCtx.strokeStyle = "#00ffba"; 
+            targetCtx.lineWidth = 1;
 
             if (sys === 'modular' || sys === 'columns') {
                 const cw = (wPx - (cols - 1) * gutter) / cols;
                 const rh = (hPx - (rows - 1) * gutter) / rows;
-                for (let i = 0; i < cols; i++) ctx.strokeRect(i * (cw + gutter), 0, cw, hPx);
-                if (sys === 'modular') for (let j = 0; j < rows; j++) ctx.strokeRect(0, j * (rh + gutter), wPx, rh);
+                for (let i = 0; i < cols; i++) targetCtx.strokeRect(i * (cw + gutter), 0, cw, hPx);
+                if (sys === 'modular') for (let j = 0; j < rows; j++) targetCtx.strokeRect(0, j * (rh + gutter), wPx, rh);
             } else if (sys === 'isometric') {
-                renderIsometric(wPx, hPx, (parseFloat(inputs.isoScale.value) || 50) * (factor / 4));
+                renderIsometric(targetCtx, wPx, hPx, (parseFloat(inputs.isoScale.value) || 50) * (factor / 4));
             } else if (sys === 'golden_section') {
-                const phi = 1.61803398875;
+                const phi = 1.618;
                 const x = wPx / phi; const y = hPx / phi;
-                ctx.strokeRect(0, 0, x, hPx); ctx.strokeRect(wPx-x, 0, x, hPx);
-                ctx.strokeRect(0, 0, wPx, y); ctx.strokeRect(0, hPx-y, wPx, y);
+                targetCtx.strokeRect(0, 0, x, hPx); targetCtx.strokeRect(wPx-x, 0, x, hPx);
+                targetCtx.strokeRect(0, 0, wPx, y); targetCtx.strokeRect(0, hPx-y, wPx, y);
             } else if (sys === 'vandegraaf') {
-                ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(wPx, hPx); ctx.moveTo(wPx, 0); ctx.lineTo(0, hPx);
-                ctx.moveTo(wPx/2, 0); ctx.lineTo(0, hPx); ctx.moveTo(wPx/2, 0); ctx.lineTo(wPx, hPx);
-                ctx.stroke(); ctx.strokeRect(wPx/9, hPx/9, wPx*7/9, hPx*7/9);
+                targetCtx.beginPath(); targetCtx.moveTo(0,0); targetCtx.lineTo(wPx, hPx); targetCtx.moveTo(wPx, 0); targetCtx.lineTo(0, hPx);
+                targetCtx.moveTo(wPx/2, 0); targetCtx.lineTo(0, hPx); targetCtx.moveTo(wPx/2, 0); targetCtx.lineTo(wPx, hPx);
+                targetCtx.stroke(); targetCtx.strokeRect(wPx/9, hPx/9, wPx*7/9, hPx*7/9);
             } else if (sys === 'diagonal') {
-                ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(wPx, hPx); ctx.moveTo(wPx, 0); ctx.lineTo(0, hPx);
-                ctx.moveTo(wPx/2, 0); ctx.lineTo(wPx/2, hPx); ctx.moveTo(0, hPx/2); ctx.lineTo(wPx, hPx/2); ctx.stroke();
+                targetCtx.beginPath(); targetCtx.moveTo(0,0); targetCtx.lineTo(wPx, hPx); targetCtx.moveTo(wPx, 0); targetCtx.lineTo(0, hPx);
+                targetCtx.moveTo(wPx/2, 0); targetCtx.lineTo(wPx/2, hPx); targetCtx.moveTo(0, hPx/2); targetCtx.lineTo(wPx, hPx/2); targetCtx.stroke();
             } else if (sys === 'dots') {
                 const cx = parseInt(inputs.cols.value); const ry = parseInt(inputs.rows.value);
-                ctx.fillStyle = "#00ffba";
+                targetCtx.fillStyle = "#00ffba";
                 for (let i = 0; i <= cx; i++) for (let j = 0; j <= ry; j++) {
-                    ctx.beginPath(); ctx.arc(i * (wPx/cx), j * (hPx/ry), 2, 0, Math.PI*2); ctx.fill();
+                    targetCtx.beginPath(); targetCtx.arc(i * (wPx/cx), j * (hPx/ry), 2, 0, Math.PI*2); targetCtx.fill();
                 }
             } else if (sys === 'rule_of_thirds') {
                 for(let i=1; i<3; i++) {
-                    ctx.beginPath(); ctx.moveTo(i*wPx/3, 0); ctx.lineTo(i*wPx/3, hPx); ctx.stroke();
-                    ctx.beginPath(); ctx.moveTo(0, i*hPx/3); ctx.lineTo(wPx, i*hPx/3); ctx.stroke();
+                    targetCtx.beginPath(); targetCtx.moveTo(i*wPx/3, 0); targetCtx.lineTo(i*wPx/3, hPx); targetCtx.stroke();
+                    targetCtx.beginPath(); targetCtx.moveTo(0, i*hPx/3); targetCtx.lineTo(wPx, i*hPx/3); targetCtx.stroke();
                 }
             }
         }
 
-        function renderIsometric(w, h, step) {
-            ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.clip();
+        function renderIsometric(targetCtx, w, h, step) {
+            targetCtx.save(); targetCtx.beginPath(); targetCtx.rect(0, 0, w, h); targetCtx.clip();
             const hStep = step * Math.sqrt(3);
             for (let i = -w * 2; i < w * 3; i += hStep) { 
-                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, h); ctx.stroke(); 
+                targetCtx.beginPath(); targetCtx.moveTo(i, 0); targetCtx.lineTo(i, h); targetCtx.stroke(); 
             }
             for (let i = -h * 3; i < h * 3; i += step * 2) {
-                ctx.beginPath(); ctx.moveTo(-w, i); ctx.lineTo(w * 2, i + (w * 3) / Math.sqrt(3)); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(-w, i); ctx.lineTo(w * 2, i - (w * 3) / Math.sqrt(3)); ctx.stroke();
+                targetCtx.beginPath(); targetCtx.moveTo(-w, i); targetCtx.lineTo(w * 2, i + (w * 3) / Math.sqrt(3)); targetCtx.stroke();
+                targetCtx.beginPath(); targetCtx.moveTo(-w, i); targetCtx.lineTo(w * 2, i - (w * 3) / Math.sqrt(3)); targetCtx.stroke();
             }
-            ctx.restore();
+            targetCtx.restore();
         }
 
         function updateDocument() {
-            const w = inputs.width.value;
-            const h = inputs.height.value;
+            const w = inputs.width.value; const h = inputs.height.value;
             const factor = currentUnit === 'mm' ? MM_TO_PX : 1;
             container.style.width = (w * factor) + 'px';
             container.style.height = (h * factor) + 'px';
-            
-            const selectedOption = inputs.presets.options[inputs.presets.selectedIndex];
-            badgeFormatName.textContent = inputs.presets.value === 'custom' ? 'CUSTOM' : (selectedOption.text.split(' (')[0]);
+            const sel = inputs.presets.options[inputs.presets.selectedIndex];
+            badgeFormatName.textContent = inputs.presets.value === 'custom' ? 'CUSTOM' : (sel.text.split(' (')[0]);
             badgeDimText.textContent = `${w} × ${h} ${currentUnit}`;
-
             document.querySelectorAll('.doc-unit').forEach(el => el.textContent = currentUnit);
-            
-            autoFitZoom();
-            render();
-            saveState();
+            autoFitZoom(); render(); saveState();
         }
 
         inputs.presets.addEventListener('change', () => {
-            if (inputs.presets.value === 'custom') {
-                updateDocument();
-                return;
-            }
+            if (inputs.presets.value === 'custom') { updateDocument(); return; }
             const p = inputs.presets.value.split(',');
-            currentPresetType = p[0]; 
-            inputs.width.value = p[1]; 
-            inputs.height.value = p[2];
-            inputs.bleed.value = p[3] || 0;
-            specialFormat = p[4] || null;
+            currentPresetType = p[0]; inputs.width.value = p[1]; inputs.height.value = p[2];
+            inputs.bleed.value = p[3] || 0; specialFormat = p[4] || null;
             currentUnit = (currentPresetType === 'print') ? 'mm' : 'px';
             updateDocument();
         });
 
         [inputs.width, inputs.height].forEach(el => el.addEventListener('change', updateDocument));
-
         inputs.bgImage.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
             const reader = new FileReader();
-            reader.onload = (event) => {
+            reader.onload = (ev) => {
                 const img = new Image();
-                img.onload = () => { 
-                    bgImageObj = img; 
-                    updateImageBtnUI(true);
-                    render(); 
-                };
-                img.src = event.target.result;
+                img.onload = () => { bgImageObj = img; updateImageBtnUI(true); render(); };
+                img.src = ev.target.result;
             };
             reader.readAsDataURL(file);
         });
-
-        inputs.bgOpacity.addEventListener('input', render);
-
+        inputs.bgOpacity.addEventListener('input', () => render());
         Object.values(inputs).forEach(input => {
             if(!['widthInput', 'heightInput', 'formatPresets', 'bgImageInput', 'bgOpacityInput'].includes(input.id)) {
                 input.addEventListener('change', updateDocument);
             }
         });
 
-        function exportPNG() {
+        // Modal Logic
+        function openModal(title, type) {
+            const modal = document.getElementById('exportModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const instructions = document.getElementById('modalInstructions');
+            modalTitle.textContent = title;
+            
+            let html = "";
+            if(type === 'PNG') {
+                html = `
+                    <li>Décompressez le fichier <b>ZIP</b> téléchargé.</li>
+                    <li>Transférez les images <b>PNG</b> sur votre iPad.</li>
+                    <li>Dans <b>Procreate</b>, importez-les comme de nouveaux calques.</li>
+                    <li>Mettez le calque de grille en mode "Produit" pour dessiner par-dessus.</li>
+                `;
+            } else {
+                html = `
+                    <li>Lancez votre logiciel <b>${type}</b>.</li>
+                    <li>Allez dans le menu <b>Fichier > Scripts > Parcourir...</b></li>
+                    <li>Sélectionnez le fichier <b>.jsx</b> téléchargé.</li>
+                    <li>Votre document se configurera instantanément.</li>
+                `;
+            }
+            instructions.innerHTML = html;
+            modal.classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('exportModal').classList.remove('active');
+        }
+
+        async function exportPNG() {
+            const zip = new JSZip();
+            const offscreen = document.createElement('canvas');
+            const oCtx = offscreen.getContext('2d');
+            const w = parseFloat(inputs.width.value); const h = parseFloat(inputs.height.value);
+            const sys = inputs.system.value;
+            const factor = currentUnit === 'mm' ? MM_TO_PX : 1;
+            const wPx = w * factor; const hPx = h * factor;
+            const baseFileName = `GridGen_Procreate_${specialFormat || 'Custom'}_${sys}`;
+
+            offscreen.width = wPx; offscreen.height = hPx;
+            render(oCtx, true);
+            oCtx.save();
+            oCtx.globalCompositeOperation = 'destination-out';
+            oCtx.fillStyle = 'white';
+            if (specialFormat === 'FB_Cover') {
+                oCtx.fillRect(0, 0, 90 * factor, hPx); oCtx.fillRect(wPx - (90 * factor), 0, 90 * factor, hPx);
+            } else if (specialFormat === 'X_Cover') {
+                oCtx.fillRect(0, 0, wPx, 50 * factor); oCtx.fillRect(0, hPx - (50 * factor), wPx, 50 * factor);
+            } else if (specialFormat === 'Story') {
+                oCtx.fillRect(0, 0, wPx, hPx * 0.14); oCtx.fillRect(0, hPx * 0.80, wPx, hPx * 0.20);
+            }
+            oCtx.restore();
+            zip.file(`${baseFileName}.png`, offscreen.toDataURL("image/png").split(',')[1], {base64: true});
+
+            if (specialFormat === 'FB_Cover' || specialFormat === 'X_Cover' || specialFormat === 'Story') {
+                oCtx.clearRect(0, 0, wPx, hPx);
+                oCtx.fillStyle = "#ff00ff"; oCtx.globalAlpha = 0.5;
+                if (specialFormat === 'FB_Cover') {
+                    oCtx.fillRect(0, 0, 90 * factor, hPx); oCtx.fillRect(wPx - (90 * factor), 0, 90 * factor, hPx);
+                } else if (specialFormat === 'X_Cover') {
+                    oCtx.fillRect(0, 0, wPx, 50 * factor); oCtx.fillRect(0, hPx - (50 * factor), wPx, 50 * factor);
+                } else if (specialFormat === 'Story') {
+                    oCtx.fillRect(0, 0, wPx, hPx * 0.14); oCtx.fillRect(0, hPx * 0.80, wPx, hPx * 0.20);
+                }
+                zip.file(`${baseFileName}_safe-zone.png`, offscreen.toDataURL("image/png").split(',')[1], {base64: true});
+            }
+
+            const content = await zip.generateAsync({type: "blob"});
             const link = document.createElement('a');
-            link.download = `Grid_${inputs.system.value}.png`;
-            link.href = canvas.toDataURL("image/png");
+            link.download = `${baseFileName}.zip`;
+            link.href = URL.createObjectURL(content);
             link.click();
+            openModal("PNG (Procreate) Prêt", "PNG");
         }
 
         function runExport(app) {
-            const w = parseFloat(inputs.width.value);
-            const h = parseFloat(inputs.height.value);
-            const b = parseFloat(inputs.bleed.value);
-            const sys = inputs.system.value;
+            const w = parseFloat(inputs.width.value); const h = parseFloat(inputs.height.value);
+            const b = parseFloat(inputs.bleed.value); const sys = inputs.system.value;
             const isMM = currentUnit === 'mm';
-            
             let jsx = `// GridGen Pro Export - ${app}\n`;
-            
             if (app === 'InDesign') {
                 jsx += `app.scriptPreferences.measurementUnit = MeasurementUnits.${isMM ? 'MILLIMETERS' : 'PIXELS'};\n`;
-                jsx += `var doc = app.documents.add({\n`;
-                jsx += `  documentPreferences: {\n`;
-                jsx += `    pageWidth: ${w}, pageHeight: ${h},\n`;
-                jsx += `    documentBleedTopOffset: ${b}, documentBleedBottomOffset: ${b},\n`;
-                jsx += `    documentBleedInsideOrLeftOffset: ${b}, documentBleedOutsideOrRightOffset: ${b}\n`;
-                jsx += `  }\n});\n`;
-                jsx += `var page = doc.pages[0];\n`;
-                jsx += `var layer = doc.layers.add({name: "Guides Structurels", layerColor: [0, 255, 186]});\n\n`;
-                jsx += `function addGuide(pos, orient) {\n`;
-                jsx += `  if (pos < 0 || (orient == HorizontalOrVertical.VERTICAL && pos > ${w}) || (orient == HorizontalOrVertical.HORIZONTAL && pos > ${h})) return;\n`;
-                jsx += `  page.guides.add(layer, {location: pos, orientation: orient});\n}\n`;
-                jsx += `function addTracedGuide(pts) {\n`;
-                jsx += `  var line = page.graphicLines.add(layer);\n`;
-                jsx += `  line.paths[0].entirePath = pts;\n`;
-                jsx += `  try { line.makeGuide(); } catch(e) { line.itemLayer = layer; }\n}\n\n`;
-
+                jsx += `var doc = app.documents.add({documentPreferences:{pageWidth:${w},pageHeight:${h},documentBleedTopOffset:${b},documentBleedBottomOffset:${b},documentBleedInsideOrLeftOffset:${b},documentBleedOutsideOrRightOffset:${b}}});\n`;
+                jsx += `var page = doc.pages[0]; var layer = doc.layers.add({name:"Guides Structurels",layerColor:[0,255,186]});\n`;
                 if (sys === 'modular' || sys === 'columns') {
                     const cols = parseInt(inputs.cols.value); const rows = sys === 'modular' ? parseInt(inputs.rows.value) : 1;
                     const g = parseFloat(inputs.gutter.value);
                     const cw = (w - (cols - 1) * g) / cols; const rh = (h - (rows - 1) * g) / rows;
                     for (let i = 0; i <= cols; i++) {
-                        let p = i * (cw + g); jsx += `addGuide(${p.toFixed(4)}, HorizontalOrVertical.VERTICAL);\n`;
-                        if (i < cols && g > 0) jsx += `addGuide(${(p + cw).toFixed(4)}, HorizontalOrVertical.VERTICAL);\n`;
+                        let p = i * (cw + g); jsx += `page.guides.add(layer,{location:${p},orientation:HorizontalOrVertical.VERTICAL});\n`;
+                        if (i < cols && g > 0) jsx += `page.guides.add(layer,{location:${p+cw},orientation:HorizontalOrVertical.VERTICAL});\n`;
                     }
                     if (sys === 'modular') for (let j = 0; j <= rows; j++) {
-                        let p = j * (rh + g); jsx += `addGuide(${p.toFixed(4)}, HorizontalOrVertical.HORIZONTAL);\n`;
-                        if (j < rows && g > 0) jsx += `addGuide(${(p + rh).toFixed(4)}, HorizontalOrVertical.HORIZONTAL);\n`;
-                    }
-                } else if (sys === 'diagonal') {
-                    jsx += `addTracedGuide([[0,0],[${h},${w}]]);\naddTracedGuide([[0,${w}],[${h},0]]);\n`;
-                    jsx += `addGuide(${w/2}, HorizontalOrVertical.VERTICAL);\naddGuide(${h/2}, HorizontalOrVertical.HORIZONTAL);\n`;
-                } else if (sys === 'vandegraaf') {
-                    jsx += `addTracedGuide([[0,0],[${h},${w}]]);\naddTracedGuide([[0,${w}],[${h},0]]);\n`;
-                    jsx += `addTracedGuide([[0,${w/2}],[${h},0]]);\naddTracedGuide([[0,${w/2}],[${h},${w}]]);\n`;
-                    jsx += `var mX = ${w/9}; var mY = ${h/9};\n`;
-                    jsx += `addTracedGuide([[mY,mX],[mY,${w}-mX],[${h}-mY,${w}-mX],[${h}-mY,mX],[mY,mX]]);\n`;
-                } else if (sys === 'dots') {
-                    const cx = parseInt(inputs.cols.value); const ry = parseInt(inputs.rows.value);
-                    for (let i = 0; i <= cx; i++) for (let j = 0; j <= ry; j++) {
-                        let px = i * (w/cx); let py = j * (h/ry);
-                        jsx += `page.ovals.add(layer, {geometricBounds: [${py-0.2}, ${px-0.2}, ${py+0.2}, ${px+0.2}], fillColor: "Black", strokeWeight: 0});\n`;
+                        let p = j * (rh + g); jsx += `page.guides.add(layer,{location:${p},orientation:HorizontalOrVertical.HORIZONTAL});\n`;
+                        if (j < rows && g > 0) jsx += `page.guides.add(layer,{location:${p+rh},orientation:HorizontalOrVertical.HORIZONTAL});\n`;
                     }
                 }
-            } else if (app === 'Illustrator') {
-                jsx += `var doc = app.documents.add(DocumentColorSpace.RGB, ${isMM ? w*2.8346 : w}, ${isMM ? h*2.8346 : h});\n`;
-            } else if (app === 'Photoshop') {
-                jsx += `preferences.rulerUnits = Units.${isMM ? 'MM' : 'PIXELS'};\n`;
-                jsx += `var doc = app.documents.add(${w}, ${h}, 72, "GridGen");\n`;
-            }
-
-            jsx += `alert("Exportation terminée !");\n`;
+            } else if (app === 'Illustrator') jsx += `app.documents.add(DocumentColorSpace.RGB, ${isMM ? w*2.8346 : w}, ${isMM ? h*2.8346 : h});\n`;
+            else if (app === 'Photoshop') jsx += `preferences.rulerUnits = Units.${isMM ? 'MM' : 'PIXELS'};\napp.documents.add(${w}, ${h}, 72, "GridGen");\n`;
+            
             const blob = new Blob([jsx], {type: "text/plain"});
             const link = document.createElement('a');
             link.download = `GridGen_${app}_${sys}.jsx`;
             link.href = URL.createObjectURL(blob);
             link.click();
-            const diag = document.getElementById('successDialog');
-            diag.classList.add('active');
-            setTimeout(() => diag.classList.remove('active'), 2500);
+            openModal(`Script ${app} Prêt`, app);
         }
 
-        // Shortcuts
-        window.addEventListener('keydown', (e) => {
-            if (e.ctrlKey || e.metaKey) {
-                if (e.key === 'z') { e.preventDefault(); undo(); }
-                if (e.key === 'y') { e.preventDefault(); redo(); }
-            }
-        });
-
-        window.onload = () => {
-            updateDocument();
-            // Initial save state
-            saveState(); 
-        };
-        window.onresize = updateTransform;
+        window.onload = () => { updateDocument(); saveState(); };
     </script>
 </body>
 </html>
